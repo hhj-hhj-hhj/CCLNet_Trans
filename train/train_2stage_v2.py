@@ -154,6 +154,7 @@ def do_train_stage2_v2(args,
     losses_t2t = AverageMeter()
 
 
+
     loss_t2t_fn = CrossEntropyLabelSmooth(num_classes_rgb).to(device)
 
     # torch.cuda.empty_cache()

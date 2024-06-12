@@ -59,10 +59,6 @@ class SYSUData_Stage1(data.Dataset):
         else:
             print('error getitem!')
 
-        # elif self.all_cluster:
-        #     img, target, path = self.train_all_image[index], self.train_all_label[index], self.train_all_path[index]
-        #     img = self.transform(img)
-        #     return img, target, path, 'ALL'
 
     def __len__(self):
         if self.ir_cluster:
