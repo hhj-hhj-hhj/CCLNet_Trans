@@ -175,17 +175,7 @@ class build_model(nn.Module):
 
         self.neck_feat = args.neck_feat
 
-    #     分类层
-    #     self.classifier_rgb = nn.Linear(self.num_features, self.num_classes_rgb, bias=False)
-    #     self.classifier_rgb.apply(weights_init_classifier)
-    #     self.classifier_rgb_proj = nn.Linear(self.num_features_proj, self.num_classes_rgb, bias=False)
-    #     self.classifier_rgb_proj.apply(weights_init_classifier)
-    #
-    #     self.classifier_ir = nn.Linear(self.num_features, self.num_classes_ir, bias=False)
-    #     self.classifier_ir.apply(weights_init_classifier)
-    #     self.classifier_ir_proj = nn.Linear(self.num_features_proj, self.num_classes_ir, bias=False)
-    #     self.classifier_ir_proj.apply(weights_init_classifier)
-
+        # identity classification layer
         self.classifier = nn.Linear(self.num_features, self.num_classes_rgb, bias=False)
         self.classifier.apply(weights_init_classifier)
         self.classifier_proj = nn.Linear(self.num_features_proj, self.num_classes_rgb, bias=False)
@@ -229,16 +219,18 @@ class build_model(nn.Module):
         img_feature = nn.functional.avg_pool2d(image_features, image_features.shape[2:4]).view(x.shape[0], -1)
         img_feature_proj = image_features_proj[0]
 
+        # 原来cclnet的获取feature的方式
+        # if self.gm_pool  == 'on':
+        #     b, c, h, w = x.shape
+        #     x = x.view(b, c, -1)
+        #     p = 3.0
+        #     x_pool = (torch.mean(x**p, dim=-1) + 1e-12)**(1/p)
+        # else:
+        #     x_pool = self.avgpool(x)
+        #     x_pool = x_pool.view(x_pool.size(0), x_pool.size(1))
+        # feat = self.bottleneck(x_pool)
         feat = self.bottleneck(img_feature)
         feat_proj = self.bottleneck_proj(img_feature_proj)
-
-        # res_rgb, res_ir = res
-        # _, feats_rgb, _ = res_rgb
-        # _, feats_ir, _ = res_ir
-        # img_feature_rgb, img_feature_proj_rgb = feats_rgb[1], feats_rgb[1]
-        # img_feature_ir, img_feature_proj_ir = feats_ir[1], feats_ir[1]
-        #
-        # img_feature, img_feature_proj = torch.cat((img_feature_rgb, img_feature_ir), 0), torch.cat((img_feature_proj_rgb, img_feature_proj_ir), 0)
 
         if self.training:
             cls_score = self.classifier(feat)

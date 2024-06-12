@@ -145,13 +145,6 @@ def do_train_stage1(args,
         if epoch == args.stage1_maxepochs:
         # if True:
             if args.dataset == 'sysu':
-                # state = {
-                #     "state_dict": model.state_dict(),
-                #     "cmc": cmc,
-                #     "mAP": mAP,
-                #     "mINP": mINP,
-                #     "epoch": epoch,
-                # }
                 # torch.save(model.state_dict(), os.path.join(args.model_path, args.logs_file + "_stage1.pth"))
                 print('Test Epoch: {}'.format(epoch))
                 test_mode = [1, 2]
