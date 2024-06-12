@@ -15,7 +15,7 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 from torch.backends import cudnn
 
-from train.train_0stage import do_train_stage0
+
 from util.loss.make_loss import make_loss
 from util.make_optimizer import make_optimizer_2stage
 from util.optim.lr_scheduler import WarmupMultiStepLR

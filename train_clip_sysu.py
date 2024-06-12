@@ -16,9 +16,6 @@ import torchvision.transforms as transforms
 from torch.backends import cudnn
 
 from train.train_2stage_v2 import do_train_stage2_v2
-from train.train_4stage_v2 import do_train_stage4_v2
-from train.train_4stage import do_train_stage4
-from train.train_3stage import do_train_stage3
 from train.train_2stage import do_train_stage2
 from util.loss.make_loss import make_loss
 from train.train_1stage import do_train_stage1
@@ -29,9 +26,7 @@ from data.dataloader import Unlabeld_SYSUData_Pseudo, SYSUData_Stage1
 from model.make_model_clip import build_model
 from util.utils import Logger
 from model.make_model_clip import load_clip_to_cpu
-from util.optim.scheduler_p2w import cosine_lr
 
-from model.img2text import IMG2TEXT
 
 start_epoch = best_mAP = 0
 
