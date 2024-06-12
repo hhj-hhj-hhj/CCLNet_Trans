@@ -32,7 +32,7 @@ from data.dataloader import SYSUData_Stage2, RegDBData_Stage2, IterLoader, TestD
 from util.eval import tester
 from util.utils import IdentitySampler_nosk, GenIdx, IdentitySampler_nosk_stage4
 
-from model.img2text import get_text_features
+
 from util.make_optimizer import make_optimizer_2stage, make_optimizer_2stage_later
 from util.optim.lr_scheduler import WarmupMultiStepLR
 from util.loss.softmax_loss import CrossEntropyLabelSmooth
@@ -153,8 +153,7 @@ def do_train_stage2_v2(args,
     losses_tri = AverageMeter()
 
     losses_t2t = AverageMeter()
-    # losses_i2t_rgb = AverageMeter()
-    # losses_i2t_ir = AverageMeter()
+
 
     loss_t2t_fn = CrossEntropyLabelSmooth(num_classes_rgb).to(device)
 
@@ -222,25 +221,6 @@ def do_train_stage2_v2(args,
 
                 score_rgb, feat_rgb, image_features_rgb, score_ir, feat_ir, image_features_ir = model(x1=img_rgb, x2=img_ir, modal=0)
 
-                token_features_rgb = img2text(image_features_rgb)
-                token_features_ir = img2text(image_features_ir)
-
-                text_features_rgb2rgb = get_text_features(token_features_rgb, clip_model, clip_model.dtype, "A visible photo of")
-                text_features_rgb2ir = get_text_features(token_features_rgb, clip_model, clip_model.dtype, "An infrared photo of")
-                text_features_ir2rgb = get_text_features(token_features_ir, clip_model, clip_model.dtype, "A visible photo of")
-                text_features_ir2ir = get_text_features(token_features_ir, clip_model, clip_model.dtype, "An infrared photo of")
-
-                logits_rgb2rgb = text_features_rgb2rgb @ text_features_rgb.t()
-                logits_ir2rgb = text_features_ir2rgb @ text_features_rgb.t()
-                logits_rgb2ir = text_features_rgb2ir @ text_features_ir.t()
-                logits_ir2ir = text_features_ir2ir @ text_features_ir.t()
-
-                loss_t2t_rgb2rgb = loss_t2t_fn(logits_rgb2rgb, label_rgb)
-                loss_t2t_rgb2ir = loss_t2t_fn(logits_rgb2ir, label_ir)
-                loss_t2t_ir2rgb = loss_t2t_fn(logits_ir2rgb, label_rgb)
-                loss_t2t_ir2ir = loss_t2t_fn(logits_ir2ir, label_ir)
-
-                loss_t2t = (loss_t2t_rgb2rgb + loss_t2t_rgb2ir + loss_t2t_ir2rgb + loss_t2t_ir2ir)
 
                 # print(score_ir[0].shape, score_rgb[0].shape)
 
@@ -268,7 +248,7 @@ def do_train_stage2_v2(args,
                 loss_tri_ir = args.triplet_loss_weight * TRI_LOSS_IR
                 loss_tri = loss_tri_rgb + loss_tri_ir
 
-                loss = loss_rgb + loss_ir + loss_t2t
+                loss = loss_rgb + loss_ir
             #
             #
             # # out_rgb = image_features[:img_rgb.size(0)]
@@ -287,8 +267,6 @@ def do_train_stage2_v2(args,
             losses_i2t.update(loss_i2t.item())
             losses_id.update(loss_id.item())
             losses_tri.update(loss_tri.item())
-
-            losses_t2t.update(loss_t2t.item())
 
 
             losses.update(loss.item())

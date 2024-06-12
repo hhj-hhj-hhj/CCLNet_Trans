@@ -31,85 +31,6 @@ def mask_outlier(pseudo_labels):
     return np.array([i in train_labels and i != -1 for i in pseudo_labels])
 
 
-
-class Unlabeld_SYSUData_Pseudo(data.Dataset):
-    def __init__(self,data_dir,transform,rgb_cluster=False,ir_cluster=False):
-        self.train_color_image = np.load(data_dir+'train_rgb_resized_img.npy')
-        self.train_thermal_image = np.load(data_dir+'train_ir_resized_img.npy')
-
-        self.train_color_label = np.load(data_dir +'pseudo_labels/' + 'train_rgb_resized_pseudo_label.npy')
-        self.train_thermal_label = np.load(data_dir +'pseudo_labels/' + 'train_ir_resized_pseudo_label.npy')
-
-        self.train_color_path = np.load(data_dir + 'train_rgb_resized_path.npy')
-        self.train_thermal_path = np.load(data_dir + 'train_ir_resized_path.npy')
-
-        self.transform = transform
-        self.ir_cluster = ir_cluster
-        self.rgb_cluster = rgb_cluster
-
-    def __getitem__(self, index):
-        if self.rgb_cluster:
-            img1, target1, path1 = self.train_color_image[index], self.train_color_label[index], self.train_color_path[index]
-            img1 = self.transform(img1)
-            return img1, target1, path1, "RGB"
-        elif self.ir_cluster:
-            img2, target2, path2 = self.train_thermal_image[index], self.train_thermal_label[index], self.train_thermal_path[index]
-            img2 = self.transform(img2)
-            return img2, target2, path2, 'IR'
-        else:
-            print('error getitem!')
-
-    def __len__(self):
-        if self.ir_cluster:
-            return len(self.train_thermal_image)
-        elif self.rgb_cluster:
-            return len(self.train_color_image)
-        else:
-            print("error len!!")
-
-
-class Unlabeld_SYSUData(data.Dataset):
-    def __init__(self,data_dir,transform,rgb_cluster=False,ir_cluster=False):
-        self.train_color_image = np.load(data_dir+'train_rgb_resized_img.npy')
-        self.train_thermal_image = np.load(data_dir+'train_ir_resized_img.npy')
-
-        self.train_color_label = np.load(data_dir+'train_rgb_resized_label.npy')
-        self.train_thermal_label = np.load(data_dir + 'train_ir_resized_label.npy')
-
-        self.train_color_path = np.load(data_dir + 'train_rgb_resized_path.npy')
-        self.train_thermal_path = np.load(data_dir + 'train_ir_resized_path.npy')
-
-        self.transform = transform
-        self.ir_cluster = ir_cluster
-        self.rgb_cluster = rgb_cluster
-
-    def __getitem__(self, index):
-        if self.rgb_cluster:
-            img1, target1, path1 = self.train_color_image[index], self.train_color_label[index], self.train_color_path[index]
-            img1 = self.transform(img1)
-            return img1, target1, path1, "RGB"
-
-        elif self.ir_cluster:
-            img2, target2, path2 = self.train_thermal_image[index], self.train_thermal_label[index], self.train_thermal_path[index]
-            img2 = self.transform(img2)
-            return img2, target2, path2, 'IR'
-        else:
-            print('error getitem!')
-
-        # elif self.all_cluster:
-        #     img, target, path = self.train_all_image[index], self.train_all_label[index], self.train_all_path[index]
-        #     img = self.transform(img)
-        #     return img, target, path, 'ALL'
-
-    def __len__(self):
-        if self.ir_cluster:
-            return len(self.train_thermal_image)
-
-        elif self.rgb_cluster:
-            return len(self.train_color_image)
-        else:
-            print("error len!!")
-
 class SYSUData_Stage1(data.Dataset):
     def __init__(self,data_dir,transform,rgb_cluster=False,ir_cluster=False):
         self.train_color_image = np.load(data_dir+'train_rgb_resized_img.npy')
@@ -118,8 +39,8 @@ class SYSUData_Stage1(data.Dataset):
         self.train_color_label = np.load(data_dir+'train_rgb_resized_label.npy')
         self.train_thermal_label = np.load(data_dir + 'train_ir_resized_label.npy')
 
-        self.train_color_path = np.load(data_dir + 'train_rgb_resized_path.npy')
-        self.train_thermal_path = np.load(data_dir + 'train_ir_resized_path.npy')
+        # self.train_color_path = np.load(data_dir + 'train_rgb_resized_path.npy')
+        # self.train_thermal_path = np.load(data_dir + 'train_ir_resized_path.npy')
 
         self.transform = transform
         self.ir_cluster = ir_cluster
@@ -152,103 +73,17 @@ class SYSUData_Stage1(data.Dataset):
         else:
             print("error len!!")
 
-class SYSUData_nosk(data.Dataset):
-    def __init__(self, data_dir, pseudo_labels_rgb=None, pseudo_labels_ir=None, transform_train_rgb=None, transform_train_ir=None, colorIndex=None, thermalIndex=None):
-        # Load training images (path) and labels
-
-        self.train_color_image = np.load(data_dir + 'train_rgb_resized_img.npy')
-        self.train_color_label = np.asarray(pseudo_labels_rgb)
-
-        self.train_thermal_image = np.load(data_dir + 'train_ir_resized_img.npy')
-        self.train_thermal_label = np.asarray(pseudo_labels_ir)
-
-        mask_color = mask_outlier(self.train_color_label)
-        self.train_color_image = self.train_color_image[mask_color]
-        self.train_color_label = self.train_color_label[mask_color]
-        ids_container = list(np.unique(self.train_color_label))
-        id2label = {id_: label for label, id_ in enumerate(ids_container)}
-        for i, label in enumerate(self.train_color_label):
-            self.train_color_label[i] = id2label[label]
-
-        mask_thermal = mask_outlier(self.train_thermal_label)
-        self.train_thermal_image = self.train_thermal_image[mask_thermal]
-        self.train_thermal_label = self.train_thermal_label[mask_thermal]
-        ids_container = list(np.unique(self.train_thermal_label))
-        id2label = {id_: label for label, id_ in enumerate(ids_container)}
-        for i, label in enumerate(self.train_thermal_label):
-            self.train_thermal_label[i] = id2label[label]
-
-        self.transform_train_rgb = transform_train_rgb
-        self.transform_train_ir = transform_train_ir
-        self.cIndex = colorIndex
-        self.tIndex = thermalIndex
-
-    def __getitem__(self, index):
-        img1, target1 = self.train_color_image[self.cIndex[index]], self.train_color_label[self.cIndex[index]]
-        img2, target2 = self.train_thermal_image[self.tIndex[index]], self.train_thermal_label[self.tIndex[index]]
-        img1 = self.transform_train_rgb(img1)
-        img2 = self.transform_train_ir(img2)
-
-        return img1, img2, target1, target2
-
-    def __len__(self):
-        return len(self.train_color_label)
-
-class SYSUData_Stage0(data.Dataset):
-    def __init__(self, data_dir, pseudo_labels_rgb=None, pseudo_labels_ir=None, transform_train_rgb=None, transform_train_ir=None, colorIndex=None, thermalIndex=None):
-        # Load training images (path) and labels
-
-        self.train_color_image = np.load(data_dir + 'train_rgb_resized_img.npy')
-        self.train_color_pseudo_label = np.asarray(pseudo_labels_rgb)
-
-        self.train_thermal_image = np.load(data_dir + 'train_ir_resized_img.npy')
-        self.train_thermal_pseudo_label = np.asarray(pseudo_labels_ir)
-
-        mask_color = mask_outlier(self.train_color_pseudo_label)
-        self.train_color_image = self.train_color_image[mask_color]
-        self.train_color_pseudo_label = self.train_color_pseudo_label[mask_color]
-        # self.train_color_label = self.train_color_label[mask_color]
-        ids_container = list(np.unique(self.train_color_pseudo_label))
-        id2label = {id_: label for label, id_ in enumerate(ids_container)}
-        for i, label in enumerate(self.train_color_pseudo_label):
-            self.train_color_pseudo_label[i] = id2label[label]
-
-        mask_thermal = mask_outlier(self.train_thermal_pseudo_label)
-        self.train_thermal_image = self.train_thermal_image[mask_thermal]
-        self.train_thermal_pseudo_label = self.train_thermal_pseudo_label[mask_thermal]
-        # self.train_thermal_label = self.train_thermal_label[mask_thermal]
-        ids_container = list(np.unique(self.train_thermal_pseudo_label))
-        id2label = {id_: label for label, id_ in enumerate(ids_container)}
-        for i, label in enumerate(self.train_thermal_pseudo_label):
-            self.train_thermal_pseudo_label[i] = id2label[label]
-
-        self.transform_train_rgb = transform_train_rgb
-        self.transform_train_ir = transform_train_ir
-        self.cIndex = colorIndex
-        self.tIndex = thermalIndex
-
-    def __getitem__(self, index):
-        img1, target1 = self.train_color_image[self.cIndex[index]], self.train_color_pseudo_label[self.cIndex[index]]
-        img2, target2 = self.train_thermal_image[self.tIndex[index]], self.train_thermal_pseudo_label[self.tIndex[index]]
-        img1 = self.transform_train_rgb(img1)
-        img2 = self.transform_train_ir(img2)
-
-        return img1, img2, target1, target2
-
-    def __len__(self):
-        return len(self.train_color_pseudo_label)
-
 
 
 class SYSUData_Stage2(data.Dataset):
     def __init__(self, data_dir, transform_train_rgb=None, transform_train_ir=None, colorIndex=None, thermalIndex=None):
         # Load training images (path) and labels
 
-        self.train_color_label = np.load('E:\\hhj\\SYSU-MM01\\' + 'train_rgb_resized_label.npy')
-        self.train_thermal_label = np.load('E:\\hhj\\SYSU-MM01\\' + 'train_ir_resized_label.npy')
+        self.train_color_label = np.load(data_dir + 'train_rgb_resized_label.npy')
+        self.train_thermal_label = np.load(data_dir + 'train_ir_resized_label.npy')
 
-        self.train_color_image = np.load('E:\\hhj\\SYSU-MM01\\' + 'train_rgb_resized_img.npy')
-        self.train_thermal_image = np.load('E:\\hhj\\SYSU-MM01\\' + 'train_ir_resized_img.npy')
+        self.train_color_image = np.load(data_dir + 'train_rgb_resized_img.npy')
+        self.train_thermal_image = np.load(data_dir + 'train_ir_resized_img.npy')
 
         self.transform_train_rgb = transform_train_rgb
         self.transform_train_ir = transform_train_ir
