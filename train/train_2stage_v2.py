@@ -51,7 +51,6 @@ def get_cluster_loader(dataset, batch_size, workers):
 
 def do_train_stage2_v2(args,
                     model,
-                    img2text,
                     clip_model,
                     optimizer,
                     scheduler,
@@ -159,11 +158,6 @@ def do_train_stage2_v2(args,
 
     # torch.cuda.empty_cache()
 
-
-
-    # 冻结img2text的参数
-    for param in img2text.parameters():
-        param.requires_grad = False
 
     for epoch in range(1, epochs+1):
         end = time.time()
