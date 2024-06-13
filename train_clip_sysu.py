@@ -115,11 +115,11 @@ def main_worker(args):
 
 
     # Optimizer
-    # optimizer_1stage = make_optimizer_1stage(args, model)
-    # scheduler_1stage = create_scheduler(optimizer_1stage, num_epochs=args.stage1_maxepochs, lr_min=args.stage1_lrmin,
-    #                                        warmup_lr_init=args.stage1_warmup_lrinit, warmup_t=args.stage1_warmup_epoch, noise_range=None)
+    optimizer_1stage = make_optimizer_1stage(args, model)
+    scheduler_1stage = create_scheduler(optimizer_1stage, num_epochs=args.stage1_maxepochs, lr_min=args.stage1_lrmin,
+                                           warmup_lr_init=args.stage1_warmup_lrinit, warmup_t=args.stage1_warmup_epoch, noise_range=None)
 
-    # do_train_stage1(args, dataset, model, optimizer_1stage, scheduler_1stage)
+    do_train_stage1(args, dataset, model, optimizer_1stage, scheduler_1stage)
 
     optimizer_2stage = make_optimizer_2stage(args, model)
     scheduler_2stage = WarmupMultiStepLR(optimizer_2stage, args.stage2_steps, args.stage2_gamma, args.stage2_warmup_factor,
