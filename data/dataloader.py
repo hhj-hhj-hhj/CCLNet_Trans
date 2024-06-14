@@ -50,9 +50,9 @@ class SYSUData_Stage1(data.Dataset):
 
     def __getitem__(self, index):
         if self.rgb_cluster:
-            img1, target1, path1 = self.train_color_image[index], self.train_color_label[index], self.train_color_path[index]
-            img1 = self.transform(img1)
-            return img1, target1, path1, self.train_parsing_image[index]
+            img1, target1 = self.train_color_image[index], self.train_color_label[index]
+            # img1 = self.transform(img1)
+            return img1, target1, self.train_parsing_image[index]
 
         elif self.ir_cluster:
             img2, target2, path2 = self.train_thermal_image[index], self.train_thermal_label[index], self.train_thermal_path[index]

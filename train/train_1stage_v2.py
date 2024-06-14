@@ -83,6 +83,7 @@ def adjust_clothes_color(image_numpy, mask_numpy):
 
 def trans_color2(trans_img, parsing_img, clothe_color_list):
     parsing_img = parsing_img.cpu().numpy()
+
     trans_img = trans_img.cpu().numpy()
     for clothe_color in clothe_color_list:
         clothes_pixels = np.all(parsing_img == clothe_color, axis=-1, keepdims=True)
@@ -107,19 +108,8 @@ def do_train_stage1_v2(args,
     device = "cuda"
     scaler = amp.GradScaler()
     xent = SupConLoss(device)
-
+    #
     with torch.no_grad():
-
-        print("==> Extract RGB features")
-        dataset.rgb_cluster = True
-        dataset.ir_cluster = False
-        cluster_loader_rgb = get_cluster_loader(dataset, args.test_batch_size, args.workers)
-        features_rgb, labels_rgb, images ,parsing = extract_features_clip(model, cluster_loader_rgb, modal=1, get_image=True)
-        
-        features_rgb = torch.cat([features_rgb[path].unsqueeze(0) for path in dataset.train_color_path], 0).cuda()
-        labels_rgb = torch.cat([labels_rgb[path].unsqueeze(0) for path in dataset.train_color_path], 0)
-        images = torch.cat([images[path].unsqueeze(0) for path in dataset.train_color_path], 0)
-        parsing = torch.cat([parsing[path].unsqueeze(0) for path in dataset.train_color_path], 0)
 
         print("==> Extract IR features")
         dataset.ir_cluster = True
@@ -129,76 +119,81 @@ def do_train_stage1_v2(args,
         features_ir = torch.cat([features_ir[path].unsqueeze(0) for path in dataset.train_thermal_path], 0).cuda()
         labels_ir = torch.cat([labels_ir[path].unsqueeze(0) for path in dataset.train_thermal_path], 0)
 
-    del cluster_loader_rgb, cluster_loader_ir
+    del  cluster_loader_ir
+    # labels_ir = [torch.tensor([1]) for i in range(40000)]
+    # features_ir = [torch.tensor([1]) for i in range(40000)]
+    # labels_ir = torch.cat(labels_ir, dim=-1)
+    # features_ir = torch.cat(features_ir, dim=-1)
 
-    # adjust pseudo where label is -1
-    valid_idx_rgb = np.where(labels_rgb.cpu() != -1)[0]
-    features_rgb = features_rgb[valid_idx_rgb, :]
-    labels_rgb = labels_rgb[valid_idx_rgb].cuda()
-
-    valid_idx_ir = np.where(labels_ir.cpu() != -1)[0]
-    features_ir = features_ir[valid_idx_ir, :]
-    labels_ir = labels_ir[valid_idx_ir].cuda()
-
-    nums_rgb = len(labels_rgb)
-    nums_ir = len(labels_ir)
+    nums_rgb = len(dataset.train_color_label)
+    nums_ir = len(dataset.train_thermal_label)
 
     start_time = time.monotonic()
+
+    dataset.ir_cluster = False
+    dataset.rgb_cluster = True
+    dataloader_rgb = get_cluster_loader(dataset, args.stage1_batch_size, args.workers)
+
     for epoch in range(1, args.stage1_maxepochs + 1):
         scheduler.step(epoch)
         model.train()
 
-        if nums_rgb > nums_ir:
-            iter_list_rgb = torch.randperm(nums_rgb).to(device)
-            iter_list_ir = torch.cat([torch.randperm(nums_ir), torch.randint(0, nums_ir, (nums_rgb - nums_ir,))],
-                                     dim=0).to(device)
-        elif nums_rgb == nums_ir:
-            iter_list_rgb = torch.randperm(nums_rgb).to(device)
-            iter_list_ir = torch.randperm(nums_ir).to(device)
-        else:
-            iter_list_ir = torch.randperm(nums_ir).to(device)
-            iter_list_rgb = torch.cat([torch.randperm(nums_rgb), torch.randint(0, nums_rgb, (nums_ir - nums_rgb,))],
-                                      dim=0).to(device)
+        iter_list_ir = torch.cat([torch.randperm(nums_ir),torch.randint(0,nums_ir,(nums_rgb-nums_ir,))],dim=0).to(device)
 
         batch = args.stage1_batch_size
-        i_ter = len(iter_list_rgb) // batch
+        i_ter = len(iter_list_ir) // batch
 
-        print('-----len of rgb and ir iter_list------', len(iter_list_rgb), len(iter_list_ir))
+        print('-----len of rgb and ir iter_list------', len(iter_list_ir), len(iter_list_ir))
         print('---------------------------------------------------------------------')
         print("the learning rate is ", optimizer.state_dict()['param_groups'][0]['lr'])
         print('---------------------------------------------------------------------')
 
         loss_meter = AverageMeter()
 
-        for i in range(i_ter + 1):
+        for i, (images, labels, parsing) in enumerate(dataloader_rgb):
             optimizer.zero_grad()
             if i != i_ter:
-                b_list_rgb = iter_list_rgb[i * batch:(i + 1) * batch]
                 b_list_ir = iter_list_ir[i * batch:(i + 1) * batch]
             else:
-                b_list_rgb = iter_list_rgb[i * batch:len(iter_list_rgb)]
-                b_list_ir = iter_list_ir[i * batch:len(iter_list_rgb)]
+                b_list_ir = iter_list_ir[i * batch:]
 
-            target_rgb = labels_rgb[b_list_rgb]
             target_ir = labels_ir[b_list_ir]
-
-            image_features_rgb = features_rgb[b_list_rgb]
-            images_rgb = images[b_list_rgb]
-            image_parsing = parsing[b_list_rgb]
-
             image_features_ir = features_ir[b_list_ir]
 
+
+            # image_features_rgb = features_rgb[b_list_rgb]
+            target_rgb = labels.to(device)
+            images_rgb = images.to(device)
+            image_parsing = parsing.to(device)
+
             trans_imgs = []
-            for trans_img, parse in zip(images_rgb, image_parsing):
+            imgs_rgb = []
+            # images_rgb = images_rgb.permute(0,2,3,1)
+            for idx, (trans_img, parse) in enumerate(zip(images_rgb, image_parsing)):
+                init_img = trans_img.clone()
+                imgs_rgb.append(transform_test(init_img.permute(2,0,1)))
                 trans_img = trans_color2(trans_img, parse, trans_color_list)
+                trans_img = transform_test(trans_img)
                 trans_imgs.append(trans_img)
 
-            trans_imgs = [torch.from_numpy(img) for img in trans_imgs]  # 将numpy数组转换为tensor
+            images_rgb = imgs_rgb
+            images_rgb = torch.stack(images_rgb)  # 将tensor堆叠成一个4D tensor
+            images_rgb = images_rgb.to(device)
+
+
             trans_imgs = torch.stack(trans_imgs)  # 将tensor堆叠成一个4D tensor
             trans_imgs = trans_imgs.to(device)
 
+
+            # images_rgb = transform_test(images_rgb)
+            # trans_imgs = transform_test(trans_imgs)
+
+            # images_rgb = images_rgb.permute(0, 3, 1, 2)
+            # trans_imgs = images_rgb.permute(0, 3, 1, 2)
+
             with torch.no_grad():
                 trans_feature = model(trans_imgs, trans_imgs, modal=1, get_image=True)
+                image_features_rgb = model(images_rgb, images_rgb, modal=1, get_image=True)
 
             text_features_rgb = model(get_text=True, label=target_rgb, modal=1)
             text_features_ir = model(get_text=True, label=target_ir, modal=2)
