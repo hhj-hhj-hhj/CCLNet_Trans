@@ -18,6 +18,7 @@ from torch.backends import cudnn
 from train.train_2stage_v2 import do_train_stage2_v2
 from train.train_2stage import do_train_stage2
 from util.loss.make_loss import make_loss
+from train.train_1stage_v2 import do_train_stage1_v2
 from train.train_1stage import do_train_stage1
 from util.make_optimizer import make_optimizer_1stage, make_optimizer_2stage
 from util.optim.lr_scheduler import WarmupMultiStepLR
@@ -107,11 +108,9 @@ def main_worker(args):
     clip_model = load_clip_to_cpu(model.model_name, model.h_resolution, model.w_resolution, model.vision_stride_size)
     clip_model.to("cuda")
 
-    checkpoint = torch.load(args.resume_path)
-    model.load_state_dict(checkpoint['state_dict'])
+    # checkpoint = torch.load(args.resume_path)
+    # model.load_state_dict(checkpoint['state_dict'])
     model.to("cuda")
-
-
 
 
     # Optimizer
@@ -119,16 +118,17 @@ def main_worker(args):
     scheduler_1stage = create_scheduler(optimizer_1stage, num_epochs=args.stage1_maxepochs, lr_min=args.stage1_lrmin,
                                            warmup_lr_init=args.stage1_warmup_lrinit, warmup_t=args.stage1_warmup_epoch, noise_range=None)
 
-    do_train_stage1(args, dataset, model, optimizer_1stage, scheduler_1stage)
+    print("开始一阶段训练")
+    do_train_stage1_v2(args, dataset, model, optimizer_1stage, scheduler_1stage)
 
-    optimizer_2stage = make_optimizer_2stage(args, model)
-    scheduler_2stage = WarmupMultiStepLR(optimizer_2stage, args.stage2_steps, args.stage2_gamma, args.stage2_warmup_factor,
-                                         args.stage2_warmup_iters, args.stage2_warmup_method)
-
-    loss_func_rgb = make_loss(args, num_classes=n_color_class)
-    loss_func_ir = make_loss(args, num_classes=n_thermal_class)
-
-    do_train_stage2_v2(args, model, clip_model, optimizer_2stage, scheduler_2stage, loss_func_rgb, loss_func_ir)
+    # optimizer_2stage = make_optimizer_2stage(args, model)
+    # scheduler_2stage = WarmupMultiStepLR(optimizer_2stage, args.stage2_steps, args.stage2_gamma, args.stage2_warmup_factor,
+    #                                      args.stage2_warmup_iters, args.stage2_warmup_method)
+    #
+    # loss_func_rgb = make_loss(args, num_classes=n_color_class)
+    # loss_func_ir = make_loss(args, num_classes=n_thermal_class)
+    #
+    # do_train_stage2_v2(args, model, clip_model, optimizer_2stage, scheduler_2stage, loss_func_rgb, loss_func_ir)
     # do_train_stage2(args, dataset, model, optimizer_2stage, scheduler_2stage, loss_func_rgb, loss_func_ir)
 
 

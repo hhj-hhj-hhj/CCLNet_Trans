@@ -39,8 +39,10 @@ class SYSUData_Stage1(data.Dataset):
         self.train_color_label = np.load(data_dir+'train_rgb_resized_label.npy')
         self.train_thermal_label = np.load(data_dir + 'train_ir_resized_label.npy')
 
-        # self.train_color_path = np.load(data_dir + 'train_rgb_resized_path.npy')
-        # self.train_thermal_path = np.load(data_dir + 'train_ir_resized_path.npy')
+        self.train_parsing_image = np.load(data_dir + 'train_parsing_img.npy')
+
+        self.train_color_path = np.load(data_dir + 'train_rgb_resized_path.npy')
+        self.train_thermal_path = np.load(data_dir + 'train_ir_resized_path.npy')
 
         self.transform = transform
         self.ir_cluster = ir_cluster
@@ -50,12 +52,12 @@ class SYSUData_Stage1(data.Dataset):
         if self.rgb_cluster:
             img1, target1, path1 = self.train_color_image[index], self.train_color_label[index], self.train_color_path[index]
             img1 = self.transform(img1)
-            return img1, target1, path1, "RGB"
+            return img1, target1, path1, self.train_parsing_image[index]
 
         elif self.ir_cluster:
             img2, target2, path2 = self.train_thermal_image[index], self.train_thermal_label[index], self.train_thermal_path[index]
             img2 = self.transform(img2)
-            return img2, target2, path2, 'IR'
+            return img2, target2, path2
         else:
             print('error getitem!')
 

@@ -207,11 +207,56 @@ def extract_features_clip(model, data_loader, modal, get_image=False):
 
     features = OrderedDict()
     labels = OrderedDict()
+    images = OrderedDict()
+    parsing = OrderedDict()
 
     end = time.time()
     with torch.no_grad():
         loop = tqdm(enumerate(data_loader), total=len(data_loader), leave=True)
-        for i, (imgs, pids, paths, _) in loop:
+        for i, (imgs, pids, paths, parses) in loop:
+            data_time.update(time.time() - end)
+
+            inputs = imgs.cuda()
+
+            # with amp.autocast(enabled=True):
+            outputs = model(inputs, inputs, modal=modal, get_image=get_image)
+
+            for path, output, pid, img, parse in zip(paths, outputs, pids, imgs, parses):
+                features[path] = output.cpu()
+                labels[path] = pid
+                images[path] = img
+                parsing[path] = parse
+
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+            loop.set_description(f'Batch_Index[{i}/{len(data_loader)}]')
+            loop.set_postfix(batch_time=batch_time.val, data_time=data_time.val)
+
+        tqdm.write("Extract Features Done!")
+
+            # if (i + 1) % print_freq == 0:
+            #     print('Extract Features: [{}/{}]\t'
+            #           'Time {:.3f} ({:.3f})\t'
+            #           'Data {:.3f} ({:.3f})\t'
+            #           .format(i + 1, len(data_loader),
+            #                   batch_time.val, batch_time.avg,
+            #                   data_time.val, data_time.avg))
+
+    return features, labels, images ,parsing
+
+def extract_features_clip_ir(model, data_loader, modal, get_image=False):
+    model.eval()
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+
+    features = OrderedDict()
+    labels = OrderedDict()
+
+    end = time.time()
+    with torch.no_grad():
+        loop = tqdm(enumerate(data_loader), total=len(data_loader), leave=True)
+        for i, (imgs, pids, paths) in loop:
             data_time.update(time.time() - end)
 
             inputs = imgs.cuda()
