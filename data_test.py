@@ -1,41 +1,15 @@
-import argparse
-import collections
-import os
-import os.path as osp
-import shutil
-from datetime import timedelta
-import time
-import sys
-import random
-
-import easydict
-import numpy as np
-import yaml
-from sklearn.cluster import DBSCAN
 import cv2
 import torch
 import torch.utils.data as data
 import torchvision.transforms as transforms
-import torch.nn.functional as F
-# from tensorboardX import SummaryWriter
-from torch.cuda import amp
 
-from util.eval_metrics import extract_features_clip
-from util.faiss_rerank import compute_jaccard_distance
-from util.loss.supcontrast import SupConLoss
-from util.utils import AverageMeter
-
-from ClusterContrast.cm import ClusterMemory
-from data.data_manager import process_query_sysu, process_gallery_sysu
-from data.data_manager import process_test_regdb
 from data.dataloader import SYSUData_Stage2, RegDBData_Stage2, IterLoader, TestData
 from util.eval import tester
 from util.utils import IdentitySampler_nosk, GenIdx, IdentitySampler_nosk_stage4
 import matplotlib.pyplot as plt
+import numpy as np
 
-from util.make_optimizer import make_optimizer_2stage, make_optimizer_2stage_later
-from util.optim.lr_scheduler import WarmupMultiStepLR
-from util.loss.softmax_loss import CrossEntropyLabelSmooth
+device = torch.device('cuda')
 
 normalizer = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
@@ -63,44 +37,123 @@ trainloader = data.DataLoader(trainset, batch_size=64, sampler=sampler,
                               num_workers=0,
                               drop_last=True)
 
-def trans_color(original_imgs, parsing_imgs):
-    trans_imgs = original_imgs.clone()
-    clothes_color = torch.tensor([128, 0, 128], device=original_imgs.device, dtype=torch.uint8)
-    new_color = torch.tensor([0, 255, 0], device=original_imgs.device, dtype=torch.uint8)
+def imshow(img):
+    img = img.cpu()
+    plt.imshow(img)
 
-    clothes_pixels = torch.all(parsing_imgs == clothes_color, dim=-1)
-    trans_imgs[clothes_pixels] = new_color
+def adjust_clothes_color(image_numpy, mask_numpy):
+    """
+    根据提供的mask随机改变衣服颜色并保持亮度不变。
+    """
+    # 将图像从RGB转换到HSV颜色空间
+    image_hsv = cv2.cvtColor(image_numpy, cv2.COLOR_RGB2HSV)
+
+    # 生成一个随机色调
+    random_hue = np.random.randint(0, 180)  # HSV色调范围是[0, 179]
+
+    # 获得mask的布尔索引，扩展维度以适应HSV图像
+    mask_boolean = np.squeeze(mask_numpy.astype(bool))
+    mask_hsv = np.zeros_like(image_hsv, dtype=bool)
+    mask_hsv[:, :, 0] = mask_boolean
+
+    # 只改变衣服区域的色调
+    image_hsv[mask_hsv] = random_hue
+
+    # HSV颜色空间转换回RGB
+    adjusted_image_rgb = cv2.cvtColor(image_hsv, cv2.COLOR_HSV2RGB)
+
+    return adjusted_image_rgb
+
+def trans_color(trans_imgs, parsing_imgs, clothes_color):
+    # clothes_color = torch.tensor([128, 0, 128], device=trans_imgs.device, dtype=torch.uint8)
+
+    # 对于batch中的每一张图片，生成一个随机颜色
+    colors = torch.randint(0, 256, (trans_imgs.shape[0], 1, 1, 3), device=trans_imgs.device, dtype=torch.uint8)
+
+    # 找到所有匹配的像素
+    clothes_pixels = torch.all(parsing_imgs == clothes_color, dim=-1, keepdim=True)
+    clothes_pixels = clothes_pixels.expand(-1, -1, -1, 3)
+    # 使用广播机制将颜色应用到所有匹配的像素上
+    colors = colors.expand(-1, trans_imgs.shape[1], trans_imgs.shape[2], -1) # (B, H, W, 3)
+    trans_imgs[clothes_pixels] = colors[clothes_pixels]
+
     return trans_imgs
 
-device = torch.device('cuda')
+def trans_color2(trans_img, parsing_img, clothe_color):
+    clothes_pixels = torch.all(parsing_img == clothe_color, dim=-1, keepdim=True)
+
+    trans_img=adjust_clothes_color(trans_img.cpu().numpy(), clothes_pixels.cpu().numpy())
+    trans_img = torch.tensor(trans_img)
+    return trans_img
+
+
+# def get_palette(num_cls):
+#     """ Returns the color map for visualizing the segmentation mask.
+#     Args:
+#         num_cls: Number of classes
+#     Returns:
+#         The color map
+#     """
+#     n = num_cls
+#     palette = [0] * (n * 3)
+#     for j in range(0, n):
+#         lab = j
+#         palette[j * 3 + 0] = 0
+#         palette[j * 3 + 1] = 0
+#         palette[j * 3 + 2] = 0
+#         i = 0
+#         while lab:
+#             palette[j * 3 + 0] |= (((lab >> 0) & 1) << (7 - i))
+#             palette[j * 3 + 1] |= (((lab >> 1) & 1) << (7 - i))
+#             palette[j * 3 + 2] |= (((lab >> 2) & 1) << (7 - i))
+#             i += 1
+#             lab >>= 3
+#     return palette
+#
+# trans_idx = [1,3,5,6,7,8,9,10,11,12,18,19]
+# palette = get_palette(20)
+# trans_color_list = [torch.tensor(palette[3*i:3*i + 3], device=device, dtype=torch.uint8) for i in trans_idx]
+
 
 for n_iter, (img_rgb, img_ir, label_rgb, label_ir, img_parsing) in enumerate(trainloader):
     img_rgb = img_rgb.to(device)
     img_ir = img_ir.to(device)
     img_parsing = img_parsing.to(device)
-    print(img_rgb.shape, img_parsing.shape)
-    trans = trans_color(img_rgb, img_parsing)
-    for rgb, parsing, train_c in zip(img_rgb, img_parsing, trans):
-
+    trans_img = img_rgb.clone()
+    # for color in trans_color_list:
+    #     # color = torch.tensor(color, device=device, dtype=torch.uint8)
+    #     trans_img = trans_color(trans_img,img_parsing, color)
+    # trans_img = trans_color(trans_img, img_parsing)
+    for rgb, parsing, trans_c in zip(img_rgb, img_parsing, trans_img):
+        color = torch.tensor([128, 0, 128], device=device, dtype=torch.uint8)
+        trans_c = trans_color2(trans_c, parsing, color)
         print(rgb.shape, parsing.shape)
 
+        # 在同一窗口中显示三张图像
+        plt.figure(figsize=(10, 10))
+
+        plt.subplot(1, 3, 1)
+        imshow(rgb)
+        plt.title('RGB')
+
+        plt.subplot(1, 3, 2)
+        imshow(parsing)
+        plt.title('Parsing')
+
+        plt.subplot(1, 3, 3)
+        imshow(trans_c)
+        plt.title('Train_C')
+
+        plt.show()
+        input("Press Enter to continue...")
         # OpenCV需要将图像从RGB转换为BGR
-        rgb_bgr = cv2.cvtColor(rgb.cpu().numpy(), cv2.COLOR_RGB2BGR)
-        parsing_bgr = cv2.cvtColor(parsing.cpu().numpy(), cv2.COLOR_RGB2BGR)
-        train_c_bgr = cv2.cvtColor(train_c.cpu().numpy(), cv2.COLOR_RGB2BGR)
-
-        cv2.imshow('RGB', rgb_bgr)
-        cv2.imshow('Parsing', parsing_bgr)
-        cv2.imshow('Train_C', train_c_bgr)
-
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-        # plt.figure()
-        # plt.subplot(1, 3, 1)
-        # plt.imshow(rgb.cpu().numpy())
-        # plt.subplot(1, 3, 2)
-        # plt.imshow(parsing.cpu().numpy())
-        # plt.subplot(1, 3, 3)
-        # plt.imshow(train_c.cpu().numpy())
-
-        # plt.show()
+        # rgb_bgr = cv2.cvtColor(rgb.cpu().numpy(), cv2.COLOR_RGB2BGR)
+        # parsing_bgr = cv2.cvtColor(parsing.cpu().numpy(), cv2.COLOR_RGB2BGR)
+        # train_c_bgr = cv2.cvtColor(train_c.cpu().numpy(), cv2.COLOR_RGB2BGR)
+        #
+        # cv2.imshow('RGB', rgb_bgr)
+        # cv2.imshow('Parsing', parsing_bgr)
+        # cv2.imshow('Train_C', train_c_bgr)
+        #
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
