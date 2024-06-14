@@ -58,6 +58,8 @@ def adjust_clothes_color(image_numpy, mask_numpy):
 
     # 只改变衣服区域的色调
     image_hsv[mask_hsv] = random_hue
+    # 只改变衣服区域的色调
+    image_hsv[mask_hsv[:, :, 0]] = (image_hsv[mask_hsv[:, :, 0]] + random_hue) % 180
 
     # HSV颜色空间转换回RGB
     adjusted_image_rgb = cv2.cvtColor(image_hsv, cv2.COLOR_HSV2RGB)
@@ -79,40 +81,42 @@ def trans_color(trans_imgs, parsing_imgs, clothes_color):
 
     return trans_imgs
 
-def trans_color2(trans_img, parsing_img, clothe_color):
-    clothes_pixels = torch.all(parsing_img == clothe_color, dim=-1, keepdim=True)
+def trans_color2(trans_img, parsing_img, clothe_color_list):
+    parsing_img = parsing_img.cpu().numpy()
+    trans_img = trans_img.cpu().numpy()
+    for clothe_color in clothe_color_list:
+        clothes_pixels = np.all(parsing_img == clothe_color, axis=-1, keepdims=True)
+        trans_img = adjust_clothes_color(trans_img, clothes_pixels)
 
-    trans_img=adjust_clothes_color(trans_img.cpu().numpy(), clothes_pixels.cpu().numpy())
-    trans_img = torch.tensor(trans_img)
     return trans_img
 
 
-# def get_palette(num_cls):
-#     """ Returns the color map for visualizing the segmentation mask.
-#     Args:
-#         num_cls: Number of classes
-#     Returns:
-#         The color map
-#     """
-#     n = num_cls
-#     palette = [0] * (n * 3)
-#     for j in range(0, n):
-#         lab = j
-#         palette[j * 3 + 0] = 0
-#         palette[j * 3 + 1] = 0
-#         palette[j * 3 + 2] = 0
-#         i = 0
-#         while lab:
-#             palette[j * 3 + 0] |= (((lab >> 0) & 1) << (7 - i))
-#             palette[j * 3 + 1] |= (((lab >> 1) & 1) << (7 - i))
-#             palette[j * 3 + 2] |= (((lab >> 2) & 1) << (7 - i))
-#             i += 1
-#             lab >>= 3
-#     return palette
-#
-# trans_idx = [1,3,5,6,7,8,9,10,11,12,18,19]
-# palette = get_palette(20)
-# trans_color_list = [torch.tensor(palette[3*i:3*i + 3], device=device, dtype=torch.uint8) for i in trans_idx]
+def get_palette(num_cls):
+    """ Returns the color map for visualizing the segmentation mask.
+    Args:
+        num_cls: Number of classes
+    Returns:
+        The color map
+    """
+    n = num_cls
+    palette = [0] * (n * 3)
+    for j in range(0, n):
+        lab = j
+        palette[j * 3 + 0] = 0
+        palette[j * 3 + 1] = 0
+        palette[j * 3 + 2] = 0
+        i = 0
+        while lab:
+            palette[j * 3 + 0] |= (((lab >> 0) & 1) << (7 - i))
+            palette[j * 3 + 1] |= (((lab >> 1) & 1) << (7 - i))
+            palette[j * 3 + 2] |= (((lab >> 2) & 1) << (7 - i))
+            i += 1
+            lab >>= 3
+    return palette
+
+trans_idx = [1,3,5,6,7,8,9,10,11,12,18,19]
+palette = get_palette(20)
+trans_color_list = [np.array(palette[3*i:3*i + 3]) for i in trans_idx]
 
 
 for n_iter, (img_rgb, img_ir, label_rgb, label_ir, img_parsing) in enumerate(trainloader):
@@ -125,8 +129,8 @@ for n_iter, (img_rgb, img_ir, label_rgb, label_ir, img_parsing) in enumerate(tra
     #     trans_img = trans_color(trans_img,img_parsing, color)
     # trans_img = trans_color(trans_img, img_parsing)
     for rgb, parsing, trans_c in zip(img_rgb, img_parsing, trans_img):
-        color = torch.tensor([128, 0, 128], device=device, dtype=torch.uint8)
-        trans_c = trans_color2(trans_c, parsing, color)
+        trans_c = trans_color2(trans_c, parsing, trans_color_list)
+        trans_c = torch.tensor(trans_c, device=device)
         print(rgb.shape, parsing.shape)
 
         # 在同一窗口中显示三张图像
