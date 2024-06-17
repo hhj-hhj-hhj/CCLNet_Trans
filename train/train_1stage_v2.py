@@ -58,22 +58,25 @@ trans_color_list = [np.array(palette[3*i:3*i + 3]) for i in trans_idx]
 def adjust_clothes_color(image_numpy, mask_numpy):
     """
     根据提供的mask随机改变衣服颜色并保持亮度不变。
+    使用偏移量randon_hue来改变色调值，如果色调值超过180度，则将其反转。
     """
     # 将图像从RGB转换到HSV颜色空间
     image_hsv = cv2.cvtColor(image_numpy, cv2.COLOR_RGB2HSV)
 
     # 生成一个随机色调
-    random_hue = np.random.randint(0, 180)  # HSV色调范围是[0, 179]
+    random_hue = np.random.randint(0, 360)  # HSV色调范围是[0, 179]
 
     # 获得mask的布尔索引，扩展维度以适应HSV图像
     mask_boolean = np.squeeze(mask_numpy.astype(bool))
     mask_hsv = np.zeros_like(image_hsv, dtype=bool)
     mask_hsv[:, :, 0] = mask_boolean
 
-    # 只改变衣服区域的色调
-    image_hsv[mask_hsv] = random_hue
-    # 只改变衣服区域的色调
-    image_hsv[mask_hsv[:, :, 0]] = (image_hsv[mask_hsv[:, :, 0]] + random_hue) % 180
+    # 计算添加random_hue后的色调值
+    hues = (image_hsv[mask_hsv] + random_hue) % 360
+    # 计算“撞墙反弹”后的色调值
+    bounced_hues = 180 - (hues - 180)
+    # 使用where函数来选择色调值
+    image_hsv[mask_hsv] = np.where(hues <= 180, hues, bounced_hues)
 
     # HSV颜色空间转换回RGB
     adjusted_image_rgb = cv2.cvtColor(image_hsv, cv2.COLOR_HSV2RGB)
@@ -81,9 +84,8 @@ def adjust_clothes_color(image_numpy, mask_numpy):
     return adjusted_image_rgb
 
 
-def trans_color2(trans_img, parsing_img, clothe_color_list):
+def trans_color(trans_img, parsing_img, clothe_color_list):
     parsing_img = parsing_img.cpu().numpy()
-
     trans_img = trans_img.cpu().numpy()
     for clothe_color in clothe_color_list:
         clothes_pixels = np.all(parsing_img == clothe_color, axis=-1, keepdims=True)
@@ -172,7 +174,7 @@ def do_train_stage1_v2(args,
             for idx, (trans_img, parse) in enumerate(zip(images_rgb, image_parsing)):
                 init_img = trans_img.clone()
                 imgs_rgb.append(transform_test(init_img.permute(2,0,1)))
-                trans_img = trans_color2(trans_img, parse, trans_color_list)
+                trans_img = trans_color(trans_img, parse, trans_color_list)
                 trans_img = transform_test(trans_img)
                 trans_imgs.append(trans_img)
 

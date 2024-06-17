@@ -60,7 +60,6 @@ def adjust_clothes_color(image_numpy, mask_numpy):
     hues = (image_hsv[mask_hsv] + random_hue) % 360
     # 计算“撞墙反弹”后的色调值
     bounced_hues = 180 - (hues - 180)
-
     # 使用where函数来选择色调值
     image_hsv[mask_hsv] = np.where(hues <= 180, hues, bounced_hues)
 
@@ -69,22 +68,8 @@ def adjust_clothes_color(image_numpy, mask_numpy):
 
     return adjusted_image_rgb
 
-def trans_color(trans_imgs, parsing_imgs, clothes_color):
-    # clothes_color = torch.tensor([128, 0, 128], device=trans_imgs.device, dtype=torch.uint8)
 
-    # 对于batch中的每一张图片，生成一个随机颜色
-    colors = torch.randint(0, 256, (trans_imgs.shape[0], 1, 1, 3), device=trans_imgs.device, dtype=torch.uint8)
-
-    # 找到所有匹配的像素
-    clothes_pixels = torch.all(parsing_imgs == clothes_color, dim=-1, keepdim=True)
-    clothes_pixels = clothes_pixels.expand(-1, -1, -1, 3)
-    # 使用广播机制将颜色应用到所有匹配的像素上
-    colors = colors.expand(-1, trans_imgs.shape[1], trans_imgs.shape[2], -1) # (B, H, W, 3)
-    trans_imgs[clothes_pixels] = colors[clothes_pixels]
-
-    return trans_imgs
-
-def trans_color2(trans_img, parsing_img, clothe_color_list):
+def trans_color(trans_img, parsing_img, clothe_color_list):
     parsing_img = parsing_img.cpu().numpy()
     trans_img = trans_img.cpu().numpy()
     for clothe_color in clothe_color_list:
@@ -132,7 +117,7 @@ for n_iter, (img_rgb, img_ir, label_rgb, label_ir, img_parsing) in enumerate(tra
     #     trans_img = trans_color(trans_img,img_parsing, color)
     # trans_img = trans_color(trans_img, img_parsing)
     for rgb, parsing, trans_c in zip(img_rgb, img_parsing, trans_img):
-        trans_c = trans_color2(trans_c, parsing, trans_color_list)
+        trans_c = trans_color(trans_c, parsing, trans_color_list)
         trans_c = torch.tensor(trans_c, device=device)
         print(rgb.shape, parsing.shape)
 
