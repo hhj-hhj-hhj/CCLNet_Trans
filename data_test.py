@@ -49,17 +49,20 @@ def adjust_clothes_color(image_numpy, mask_numpy):
     image_hsv = cv2.cvtColor(image_numpy, cv2.COLOR_RGB2HSV)
 
     # 生成一个随机色调
-    random_hue = np.random.randint(0, 180)  # HSV色调范围是[0, 179]
+    random_hue = np.random.randint(0, 360)  # HSV色调范围是[0, 179]
 
     # 获得mask的布尔索引，扩展维度以适应HSV图像
     mask_boolean = np.squeeze(mask_numpy.astype(bool))
     mask_hsv = np.zeros_like(image_hsv, dtype=bool)
     mask_hsv[:, :, 0] = mask_boolean
 
-    # 只改变衣服区域的色调
-    image_hsv[mask_hsv] = random_hue
-    # 只改变衣服区域的色调
-    image_hsv[mask_hsv[:, :, 0]] = (image_hsv[mask_hsv[:, :, 0]] + random_hue) % 180
+    # 计算添加random_hue后的色调值
+    hues = (image_hsv[mask_hsv] + random_hue) % 360
+    # 计算“撞墙反弹”后的色调值
+    bounced_hues = 180 - (hues - 180)
+
+    # 使用where函数来选择色调值
+    image_hsv[mask_hsv] = np.where(hues <= 180, hues, bounced_hues)
 
     # HSV颜色空间转换回RGB
     adjusted_image_rgb = cv2.cvtColor(image_hsv, cv2.COLOR_HSV2RGB)
