@@ -73,8 +73,37 @@ class SYSUData_Stage1(data.Dataset):
 
 
 
+class SYSUData_Stage2(data.Dataset):
+    def __init__(self, data_dir, transform_train_rgb=None, transform_train_ir=None, colorIndex=None, thermalIndex=None):
+        # Load training images (path) and labels
+
+        self.train_color_label = np.load(data_dir + 'train_rgb_resized_label.npy')
+        self.train_thermal_label = np.load(data_dir + 'train_ir_resized_label.npy')
+
+        self.train_color_image = np.load(data_dir + 'train_rgb_resized_img.npy')
+        self.train_thermal_image = np.load(data_dir + 'train_ir_resized_img.npy')
+
+        # self.train_parsing_image = np.load(data_dir + 'train_parsing_img.npy')
+
+        self.transform_train_rgb = transform_train_rgb
+        self.transform_train_ir = transform_train_ir
+        self.cIndex = colorIndex
+        self.tIndex = thermalIndex
+
+    def __getitem__(self, index):
+        img1, target1 = self.train_color_image[self.cIndex[index]], self.train_color_label[self.cIndex[index]]
+        img2, target2 = self.train_thermal_image[self.tIndex[index]], self.train_thermal_label[self.tIndex[index]]
+        img1 = self.transform_train_rgb(img1)
+        img2 = self.transform_train_ir(img2)
+
+        return img1, img2, target1, target2,
+
+    def __len__(self):
+        return len(self.train_color_label)
+
+
 # class SYSUData_Stage2(data.Dataset):
-#     def __init__(self, data_dir, transform_train_rgb=None, transform_train_ir=None, colorIndex=None, thermalIndex=None):
+#     def __init__(self, data_dir, colorIndex=None, thermalIndex=None):
 #         # Load training images (path) and labels
 #
 #         self.train_color_label = np.load(data_dir + 'train_rgb_resized_label.npy')
@@ -85,48 +114,19 @@ class SYSUData_Stage1(data.Dataset):
 #
 #         self.train_parsing_image = np.load(data_dir + 'train_parsing_img.npy')
 #
-#         self.transform_train_rgb = transform_train_rgb
-#         self.transform_train_ir = transform_train_ir
+#         # self.transform_train_rgb = transform_train_rgb
+#         # self.transform_train_ir = transform_train_ir
 #         self.cIndex = colorIndex
 #         self.tIndex = thermalIndex
 #
 #     def __getitem__(self, index):
 #         img1, target1 = self.train_color_image[self.cIndex[index]], self.train_color_label[self.cIndex[index]]
 #         img2, target2 = self.train_thermal_image[self.tIndex[index]], self.train_thermal_label[self.tIndex[index]]
-#         img1 = self.transform_train_rgb(img1)
-#         img2 = self.transform_train_ir(img2)
 #
-#         return img1, img2, target1, target2,
+#         return img1, img2, target1, target2, self.train_parsing_image[self.cIndex[index]]
 #
 #     def __len__(self):
 #         return len(self.train_color_label)
-
-
-class SYSUData_Stage2(data.Dataset):
-    def __init__(self, data_dir, colorIndex=None, thermalIndex=None):
-        # Load training images (path) and labels
-
-        self.train_color_label = np.load(data_dir + 'train_rgb_resized_label.npy')
-        self.train_thermal_label = np.load(data_dir + 'train_ir_resized_label.npy')
-
-        self.train_color_image = np.load(data_dir + 'train_rgb_resized_img.npy')
-        self.train_thermal_image = np.load(data_dir + 'train_ir_resized_img.npy')
-
-        self.train_parsing_image = np.load(data_dir + 'train_parsing_img.npy')
-
-        # self.transform_train_rgb = transform_train_rgb
-        # self.transform_train_ir = transform_train_ir
-        self.cIndex = colorIndex
-        self.tIndex = thermalIndex
-
-    def __getitem__(self, index):
-        img1, target1 = self.train_color_image[self.cIndex[index]], self.train_color_label[self.cIndex[index]]
-        img2, target2 = self.train_thermal_image[self.tIndex[index]], self.train_thermal_label[self.tIndex[index]]
-
-        return img1, img2, target1, target2, self.train_parsing_image[self.cIndex[index]]
-
-    def __len__(self):
-        return len(self.train_color_label)
 
 
 
