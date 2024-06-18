@@ -4,7 +4,6 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 
 from data.dataloader import SYSUData_Stage2, RegDBData_Stage2, IterLoader, TestData
-from util.eval import tester
 from util.utils import IdentitySampler_nosk, GenIdx, IdentitySampler_nosk_stage4
 import matplotlib.pyplot as plt
 import numpy as np

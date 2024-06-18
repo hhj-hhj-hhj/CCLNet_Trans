@@ -10,7 +10,7 @@ Dataset sysu Statistics:
   thermal  |   395 |    11909
   ----------------------------
   ----------------------------
-Data loading time:	 5.089
+Data loading time:	 9.206
 Resized position embedding: %s to %s torch.Size([50, 2048]) torch.Size([163, 2048])
 Position embedding resize to height:18 width: 9
 Resized position embedding: %s to %s torch.Size([50, 2048]) torch.Size([163, 2048])
@@ -22,5 +22,4 @@ Position embedding resize to height:18 width: 9
 Resized position embedding: %s to %s torch.Size([50, 2048]) torch.Size([163, 2048])
 Position embedding resize to height:18 width: 9
 ¿ªÊ¼Ò»½×¶ÎÑµÁ·
-==> Extract RGB features
-Extract Features Done!
+==> Extract IR features
