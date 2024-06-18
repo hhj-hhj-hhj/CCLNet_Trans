@@ -64,7 +64,7 @@ def t_SNE(args,
     text_features_ir = text_features_ir.cpu().numpy()
 
 
-    tsne = TSNE(n_components=2, init='pca', random_state=0)
+    tsne = TSNE(n_components=2, init='pca', random_state=42, n_iter=1000)
     all_features = np.concatenate((text_features_rgb, text_features_ir), axis=0)
     X_tsne = tsne.fit_transform(all_features)
     X_tsne_rgb = X_tsne[:len(text_features_rgb)]
@@ -84,5 +84,20 @@ def t_SNE(args,
 
     plt.legend()
     plt.show()
+
+    # 可视化
+    # plt.figure(figsize=(10, 8))
+    #
+    # # 绘制 text_rgb 的 t-SNE 结果
+    # plt.scatter(X_tsne_rgb[:, 0], X_tsne_rgb[:, 1], c=colors, cmap='tab20', marker='o', label='text_rgb')
+    #
+    # # 绘制 text_ir 的 t-SNE 结果
+    # plt.scatter(X_tsne_ir[:, 0], X_tsne_ir[:, 1], c=colors, cmap='tab20', marker='x', label='text_ir')
+    #
+    # plt.title("t-SNE of text_rgb and text_ir")
+    # plt.xlabel("Component 1")
+    # plt.ylabel("Component 2")
+    # plt.legend(loc='best')
+    # plt.show()
     print('t-SNE finished!')
 

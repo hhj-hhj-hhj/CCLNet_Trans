@@ -10,7 +10,7 @@ Dataset sysu Statistics:
   thermal  |   395 |    11909
   ----------------------------
   ----------------------------
-Data loading time:	 9.206
+Data loading time:	 7.117
 Resized position embedding: %s to %s torch.Size([50, 2048]) torch.Size([163, 2048])
 Position embedding resize to height:18 width: 9
 Resized position embedding: %s to %s torch.Size([50, 2048]) torch.Size([163, 2048])

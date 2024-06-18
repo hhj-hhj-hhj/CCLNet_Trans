@@ -134,7 +134,7 @@ def do_train_stage1_v2(args,
 
     dataset.ir_cluster = False
     dataset.rgb_cluster = True
-    dataloader_rgb = get_cluster_loader(dataset, args.stage1_batch_size, args.workers)
+    dataloader_rgb = data.DataLoader(dataset, batch_size=args.stage1_batch_size, num_workers=args.workers, shuffle=True)
 
     for epoch in range(1, args.stage1_maxepochs + 1):
         scheduler.step(epoch)
@@ -144,6 +144,9 @@ def do_train_stage1_v2(args,
 
         batch = args.stage1_batch_size
         i_ter = len(iter_list_ir) // batch
+
+        print(len(dataloader_rgb))
+        print(len(iter_list_ir) // args.stage1_batch_size)
 
         print('-----len of rgb and ir iter_list------', len(iter_list_ir), len(iter_list_ir))
         print('---------------------------------------------------------------------')

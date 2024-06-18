@@ -52,7 +52,7 @@ def main_worker(args):
 
     model = build_model(args, 395, 395)
 
-    checkpoint = torch.load(args.resume_path)
+    checkpoint = torch.load("save/checkpoints/uploadgithub_test_sysu_stage1_add.pth")
     model.load_state_dict(checkpoint['state_dict'])
     model.to("cuda")
 
