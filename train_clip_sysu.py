@@ -128,8 +128,7 @@ def main_worker(args):
     # loss_func_rgb = make_loss(args, num_classes=n_color_class)
     # loss_func_ir = make_loss(args, num_classes=n_thermal_class)
     #
-    # do_train_stage2_v2(args, model, clip_model, optimizer_2stage, scheduler_2stage, loss_func_rgb, loss_func_ir)
-    # do_train_stage2(args, dataset, model, optimizer_2stage, scheduler_2stage, loss_func_rgb, loss_func_ir)
+    # do_train_stage2_v2(args, model, optimizer_2stage, scheduler_2stage, loss_func_rgb, loss_func_ir)
 
 
     end_time = time.monotonic()

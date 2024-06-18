@@ -144,13 +144,12 @@ def do_train_stage2_v2(args,
 
     scaler = amp.GradScaler()
     losses = AverageMeter()
-    losses_rgb = AverageMeter()
-    losses_ir = AverageMeter()
+    losses_all = AverageMeter()
     losses_i2t = AverageMeter()
     losses_id = AverageMeter()
     losses_tri = AverageMeter()
 
-    losses_t2t = AverageMeter()
+    # losses_t2t = AverageMeter()
 
 
 
@@ -189,13 +188,11 @@ def do_train_stage2_v2(args,
                                       drop_last=True)
 
         losses.reset()
-        losses_rgb.reset()
-        losses_ir.reset()
+        losses_all.reset()
         losses_i2t.reset()
         losses_id.reset()
         losses_tri.reset()
 
-        losses_t2t.reset()
 
         scheduler.step()
         # model.train()
@@ -213,36 +210,26 @@ def do_train_stage2_v2(args,
             with amp.autocast(enabled=True):
                 # res_rgb, res_ir = model(x1=img_rgb, x2=img_ir, modal=0)
 
-                score_rgb, feat_rgb, image_features_rgb, score_ir, feat_ir, image_features_ir = model(x1=img_rgb, x2=img_ir, modal=0)
-
+                # score_rgb, feat_rgb, image_features_rgb, score_ir, feat_ir, image_features_ir = model(x1=img_rgb, x2=img_ir, modal=0)
+                score_all,feat_all, image_features_all = model(x1=img_rgb, x2=img_ir, modal=0)
 
                 # print(score_ir[0].shape, score_rgb[0].shape)
 
-                logits_rgb = image_features_rgb @ text_features_rgb.t()
-                logits_ir = image_features_ir @ text_features_ir.t()
+                logits_all = image_features_all @ text_features_rgb.t()
 
-                loss_rgb = loss_fn_rgb(score_rgb, feat_rgb, logits_rgb, label_rgb)
-                loss_ir = loss_fn_ir(score_ir, feat_ir, logits_ir, label_ir)
+                loss_all = loss_fn_rgb(score_all, feat_all, logits_all, torch.cat((label_rgb, label_ir), 0))
 
-                ID_LOSS_RGB, TRI_LOSS_RGB, I2TLOSS_RGB = loss_rgb
-                ID_LOSS_IR, TRI_LOSS_IR, I2TLOSS_IR = loss_ir
+                ID_LOSS, TRI_LOSS, I2TLOSS = loss_all
 
-                loss_rgb = args.id_loss_weight * ID_LOSS_RGB + args.triplet_loss_weight * TRI_LOSS_RGB + args.i2t_loss_weight * I2TLOSS_RGB
-                loss_ir = args.id_loss_weight * ID_LOSS_IR + args.triplet_loss_weight * TRI_LOSS_IR + args.i2t_loss_weight * I2TLOSS_IR
+                loss_all = args.id_loss_weight * ID_LOSS + args.triplet_loss_weight * TRI_LOSS + args.i2t_loss_weight * I2TLOSS
 
-                loss_i2t_rgb = args.i2t_loss_weight * I2TLOSS_RGB
-                loss_i2t_ir = args.i2t_loss_weight * I2TLOSS_IR
-                loss_i2t = loss_i2t_rgb + loss_i2t_ir
+                loss_i2t = args.i2t_loss_weight * I2TLOSS
 
-                loss_id_rgb = args.id_loss_weight * ID_LOSS_RGB
-                loss_id_ir = args.id_loss_weight * ID_LOSS_IR
-                loss_id = loss_id_rgb + loss_id_ir
+                loss_id = args.id_loss_weight * ID_LOSS
 
-                loss_tri_rgb = args.triplet_loss_weight * TRI_LOSS_RGB
-                loss_tri_ir = args.triplet_loss_weight * TRI_LOSS_IR
-                loss_tri = loss_tri_rgb + loss_tri_ir
+                loss_tri = args.triplet_loss_weight * TRI_LOSS
 
-                loss = loss_rgb + loss_ir
+                # loss = loss_all
             #
             #
             # # out_rgb = image_features[:img_rgb.size(0)]
@@ -252,24 +239,22 @@ def do_train_stage2_v2(args,
             #
             # loss = loss_rgb + loss_ir + loss_i2t
 
-            scaler.scale(loss).backward()
+            scaler.scale(loss_all).backward()
             scaler.step(optimizer)
             scaler.update()
 
-            losses_rgb.update(loss_rgb.item())
-            losses_ir.update(loss_ir.item())
+            losses_all.update(loss_all.item())
             losses_i2t.update(loss_i2t.item())
             losses_id.update(loss_id.item())
             losses_tri.update(loss_tri.item())
 
 
-            losses.update(loss.item())
+            losses.update(loss_all.item())
             torch.cuda.synchronize()
             if n_iter % args.print_freq == 0:
-                print("Epoch[{}] Iteration[{}/{}], Loss_rgb_ir_i2t_id_tri: ({:.3f}) ({:.3f}) ({:.3f}) ({:.3f}) ({:.3f}) \n"
-                      "\t Loss_t2t: ({:.3f}), Base Lr: {:.2e}"
-                 .format(epoch, (n_iter + 1), len(trainloader), losses_rgb.avg, losses_ir.avg,
-                         losses_i2t.avg, losses_id.avg, losses_tri.avg, losses_t2t.avg, scheduler.get_lr()[0]))
+                print("Epoch[{}] Iteration[{}/{}], Loss_rgb_ir_i2t_id_tri: ({:.3f}) ({:.3f}) ({:.3f}) ({:.3f}), Base Lr: {:.2e}"
+                 .format(epoch, (n_iter + 1), len(trainloader), losses_all.avg,
+                         losses_i2t.avg, losses_id.avg, losses_tri.avg, scheduler.get_lr()[0]))
 
 
         if epoch % args.eval_step == 0 or (epoch == args.stage2_maxepochs):
