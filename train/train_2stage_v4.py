@@ -317,6 +317,7 @@ def do_train_stage2_v4(args,
 
                 I2TLOSS = xnet_rgb(logits_rgb, label_rgb) + xnet_ir(logits_ir, label_ir) + xnet_rgb(logits_trans, label_rgb)
 
+                ID_LOSS, TRI_LOSS, I2TLOSS = ID_LOSS / 3, TRI_LOSS / 3, I2TLOSS / 3
 
                 loss_all = args.id_loss_weight * ID_LOSS + args.triplet_loss_weight * TRI_LOSS + args.i2t_loss_weight * I2TLOSS
 
