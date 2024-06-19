@@ -96,7 +96,7 @@ class SYSUData_Stage2(data.Dataset):
         img1 = self.transform_train_rgb(img1)
         img2 = self.transform_train_ir(img2)
 
-        return img1, img2, target1, target2,
+        return img1, img2, target1, target2
 
     def __len__(self):
         return len(self.train_color_label)

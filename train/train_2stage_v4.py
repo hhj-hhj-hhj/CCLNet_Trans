@@ -36,6 +36,7 @@ from util.utils import IdentitySampler_nosk, GenIdx, IdentitySampler_nosk_stage4
 from util.make_optimizer import make_optimizer_2stage, make_optimizer_2stage_later
 from util.optim.lr_scheduler import WarmupMultiStepLR
 from util.loss.softmax_loss import CrossEntropyLabelSmooth
+import cv2
 
 # torch.backends.cuda.max_split_size_mb = 2750
 
@@ -47,9 +48,73 @@ def get_cluster_loader(dataset, batch_size, workers):
         # , pin_memory=True
     )
     return cluster_loader
+def adjust_clothes_color(image_numpy, mask_numpy):
+    """
+    根据提供的mask随机改变衣服颜色并保持亮度不变。
+    """
+    # 将图像从RGB转换到HSV颜色空间
+    image_hsv = cv2.cvtColor(image_numpy, cv2.COLOR_RGB2HSV)
+
+    # 生成一个随机色调
+    random_hue = np.random.randint(0, 360)  # HSV色调范围是[0, 179]
+
+    # 获得mask的布尔索引，扩展维度以适应HSV图像
+    mask_boolean = np.squeeze(mask_numpy.astype(bool))
+    mask_hsv = np.zeros_like(image_hsv, dtype=bool)
+    mask_hsv[:, :, 0] = mask_boolean
+
+    # 计算添加random_hue后的色调值
+    hues = (image_hsv[mask_hsv] + random_hue) % 360
+    # 计算“撞墙反弹”后的色调值
+    bounced_hues = 180 - (hues - 180)
+    # 使用where函数来选择色调值
+    image_hsv[mask_hsv] = np.where(hues <= 180, hues, bounced_hues)
+
+    # HSV颜色空间转换回RGB
+    adjusted_image_rgb = cv2.cvtColor(image_hsv, cv2.COLOR_HSV2RGB)
+
+    return adjusted_image_rgb
 
 
-def do_train_stage2_v3(args,
+def trans_color(trans_img, parsing_img, clothe_color_list):
+    parsing_img = parsing_img.cpu().numpy()
+    trans_img = trans_img.cpu().numpy()
+    for clothe_color in clothe_color_list:
+        clothes_pixels = np.all(parsing_img == clothe_color, axis=-1, keepdims=True)
+        trans_img = adjust_clothes_color(trans_img, clothes_pixels)
+
+    return trans_img
+
+
+def get_palette(num_cls):
+    """ Returns the color map for visualizing the segmentation mask.
+    Args:
+        num_cls: Number of classes
+    Returns:
+        The color map
+    """
+    n = num_cls
+    palette = [0] * (n * 3)
+    for j in range(0, n):
+        lab = j
+        palette[j * 3 + 0] = 0
+        palette[j * 3 + 1] = 0
+        palette[j * 3 + 2] = 0
+        i = 0
+        while lab:
+            palette[j * 3 + 0] |= (((lab >> 0) & 1) << (7 - i))
+            palette[j * 3 + 1] |= (((lab >> 1) & 1) << (7 - i))
+            palette[j * 3 + 2] |= (((lab >> 2) & 1) << (7 - i))
+            i += 1
+            lab >>= 3
+    return palette
+
+trans_idx = [1,3,5,6,7,8,9,10,11,12,18,19]
+palette = get_palette(20)
+trans_color_list = [np.array(palette[3*i:3*i + 3]) for i in trans_idx]
+
+
+def do_train_stage2_v4(args,
                     model,
                     optimizer,
                     scheduler,
@@ -152,7 +217,9 @@ def do_train_stage2_v3(args,
 
 
 
-    loss_t2t_fn = CrossEntropyLabelSmooth(num_classes_rgb).to(device)
+    xnet_rgb = CrossEntropyLabelSmooth(num_classes_rgb).to(device)
+    xnet_trans = CrossEntropyLabelSmooth(num_classes_rgb).to(device)
+    xnet_ir = CrossEntropyLabelSmooth(num_classes_ir).to(device)
 
     # torch.cuda.empty_cache()
 
@@ -195,7 +262,7 @@ def do_train_stage2_v3(args,
 
         scheduler.step()
         # model.train()
-        for n_iter, (img_rgb, img_ir, label_rgb, label_ir) in enumerate(trainloader):
+        for n_iter, (img_rgb, img_ir, label_rgb, label_ir, init_img_rgb, parsing_img) in enumerate(trainloader):
             model.train()
 
             optimizer.zero_grad()
@@ -205,20 +272,51 @@ def do_train_stage2_v3(args,
             img_ir = img_ir.to(device)
             label_ir = label_ir.to(device, dtype=torch.int64)
 
+            trans_imgs = []
+            for idx, (trans_img, parse) in enumerate(zip(init_img_rgb, parsing_img)):
+                trans_img = trans_color(trans_img, parse, trans_color_list)
+                trans_img = transform_train_rgb(trans_img)
+                trans_imgs.append(trans_img)
+            trans_imgs = torch.stack(trans_imgs)  # 将tensor堆叠成一个4D tensor
+            trans_imgs = trans_imgs.to(device)
+
             # 开始提取特征计算损失
             with amp.autocast(enabled=True):
                 # res_rgb, res_ir = model(x1=img_rgb, x2=img_ir, modal=0)
 
                 # score_rgb, feat_rgb, image_features_rgb, score_ir, feat_ir, image_features_ir = model(x1=img_rgb, x2=img_ir, modal=0)
                 score_all,feat_all, image_features_all = model(x1=img_rgb, x2=img_ir, modal=0)
+                score_trans, feat_trans, image_features_trans = model(x1 = trans_imgs, x2 = trans_imgs, modal=1)
+
+                score_rgb_trans = [torch.cat((rgb[:img_rgb.size(0)], trans), 0) for rgb, trans in zip(score_all, score_trans)]
+                feat_rgb_trans = [torch.cat((rgb[:img_rgb.size(0)], trans), 0) for rgb, trans in zip(feat_all, score_trans)]
+                image_features_rgb_trans = [torch.cat((rgb[:img_rgb.size(0)], trans), 0) for rgb, trans in zip(image_features_all, score_trans)]
+
+                score_ir_trans = [torch.cat((ir[img_rgb.size(0):], trans), 0) for ir, trans in zip(score_all, score_trans)]
+                feat_ir_trans = [torch.cat((ir[img_rgb.size(0):], trans), 0) for ir, trans in zip(feat_all, score_trans)]
+                image_features_ir_trans = [torch.cat((ir[:img_rgb.size(0):], trans), 0) for ir, trans in zip(image_features_all, score_trans)]
+                # score_rgb = [score[:img_rgb.size(0)] for score in score_all]
+                # score_ir = [score[img_rgb.size(0):] for score in score_all]
+                # feat_rgb = [feat[:img_rgb.size(0)] for feat in feat_all]
+                # feat_ir = [feat[img_rgb.size(0):] for feat in feat_all]
+                # image_features_rgb, image_features_ir = image_features_all[:img_rgb.size(0)], image_features_all[img_rgb.size(0):]
+
+                # del image_features_all, feat_all, score_all
 
                 # print(score_ir[0].shape, score_rgb[0].shape)
 
-                logits_all = image_features_all @ text_features_rgb.t()
+                logits_rgb = image_features_all[:img_rgb.size(0)] @ text_features_rgb.t()
+                logits_ir = image_features_all[img_rgb.size(0):] @ text_features_ir.t()
+                logits_trans = image_features_trans @ text_features_rgb.t()
 
-                loss_all = loss_fn(score_all, feat_all, logits_all, torch.cat((label_rgb, label_ir), 0))
+                loss_all = loss_fn(score_all, feat_all, torch.cat((label_rgb, label_ir), 0)) + \
+                    loss_fn(score_rgb_trans,feat_rgb_trans,torch.cat((label_rgb, label_rgb), 0)) + \
+                    loss_fn(score_ir_trans,feat_ir_trans,torch.cat((label_ir, label_rgb), 0))
 
-                ID_LOSS, TRI_LOSS, I2TLOSS = loss_all
+                ID_LOSS, TRI_LOSS = loss_all
+
+                I2TLOSS = xnet_rgb(logits_rgb, label_rgb) + xnet_ir(logits_ir, label_ir) + xnet_rgb(logits_trans, label_rgb)
+
 
                 loss_all = args.id_loss_weight * ID_LOSS + args.triplet_loss_weight * TRI_LOSS + args.i2t_loss_weight * I2TLOSS
 
@@ -228,15 +326,7 @@ def do_train_stage2_v3(args,
 
                 loss_tri = args.triplet_loss_weight * TRI_LOSS
 
-                # loss = loss_all
-            #
-            #
-            # # out_rgb = image_features[:img_rgb.size(0)]
-            # out_rgb = image_features[:img_rgb.size(0)]
-            # out_ir = image_features[img_rgb.size(0):]
-            # loss_rgb, loss_ir = memory(out_rgb, out_ir, label_rgb, label_ir)
-            #
-            # loss = loss_rgb + loss_ir + loss_i2t
+
 
             scaler.scale(loss_all).backward()
             scaler.step(optimizer)
@@ -306,7 +396,7 @@ def do_train_stage2_v3(args,
                         "mINP": mINP,
                         "epoch": epoch,
                     }
-                    torch.save(state, os.path.join(args.model_path, args.logs_file + "_stage2_V5.pth"))
+                    torch.save(state, os.path.join(args.model_path, args.logs_file + "_stage2_trans_v2.pth"))
                 print("Best Epoch [{}], Rank-1: {:.2%} |  mAP: {:.2%}| mINP: {:.2%}".format(best_epoch, best_acc, best_mAP, best_mINP))
             elif args.dataset == 'regdb':
                 print('Test Epoch: {}'.format(epoch))

@@ -15,7 +15,7 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 from torch.backends import cudnn
 
-from train.train_2stage_v2 import do_train_stage2_v2
+from train.train_2stage_v3 import do_train_stage2_v3
 from train.train_2stage import do_train_stage2
 from util.loss.make_loss import make_loss
 from train.train_1stage_v2 import do_train_stage1_v2
@@ -114,21 +114,20 @@ def main_worker(args):
 
 
     # Optimizer
-    optimizer_1stage = make_optimizer_1stage(args, model)
-    scheduler_1stage = create_scheduler(optimizer_1stage, num_epochs=args.stage1_maxepochs, lr_min=args.stage1_lrmin,
-                                           warmup_lr_init=args.stage1_warmup_lrinit, warmup_t=args.stage1_warmup_epoch, noise_range=None)
-
-    print("开始一阶段训练")
-    do_train_stage1_v2(args, dataset, model, optimizer_1stage, scheduler_1stage)
-
-    # optimizer_2stage = make_optimizer_2stage(args, model)
-    # scheduler_2stage = WarmupMultiStepLR(optimizer_2stage, args.stage2_steps, args.stage2_gamma, args.stage2_warmup_factor,
-    #                                      args.stage2_warmup_iters, args.stage2_warmup_method)
+    # optimizer_1stage = make_optimizer_1stage(args, model)
+    # scheduler_1stage = create_scheduler(optimizer_1stage, num_epochs=args.stage1_maxepochs, lr_min=args.stage1_lrmin,
+    #                                        warmup_lr_init=args.stage1_warmup_lrinit, warmup_t=args.stage1_warmup_epoch, noise_range=None)
     #
-    # loss_func_rgb = make_loss(args, num_classes=n_color_class)
-    # loss_func_ir = make_loss(args, num_classes=n_thermal_class)
-    #
-    # do_train_stage2_v2(args, model, optimizer_2stage, scheduler_2stage, loss_func_rgb, loss_func_ir)
+    # print("开始一阶段训练")
+    # do_train_stage1_v2(args, dataset, model, optimizer_1stage, scheduler_1stage)
+
+    optimizer_2stage = make_optimizer_2stage(args, model)
+    scheduler_2stage = WarmupMultiStepLR(optimizer_2stage, args.stage2_steps, args.stage2_gamma, args.stage2_warmup_factor,
+                                         args.stage2_warmup_iters, args.stage2_warmup_method)
+
+    loss_func = make_loss(args, num_classes=n_color_class)
+
+    do_train_stage2_v3(args, model, optimizer_2stage, scheduler_2stage, loss_func)
 
 
     end_time = time.monotonic()
