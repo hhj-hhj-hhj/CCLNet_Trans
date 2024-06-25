@@ -5,6 +5,8 @@ import torchvision.transforms as transforms
 from PIL import Image
 import collections
 import cv2
+import time
+from datetime import timedelta
 
 def read_image(data_files, img_w, img_h):
     train_img = []
@@ -166,6 +168,13 @@ class SYSUData_Stage1_V2(data.Dataset):
         self.train_parsing_image_ir = np.load(data_dir + 'train_parsing_img_ir.npy')
 
 
+        for i in range(len(self.train_color_image)):
+            self.train_color_image[i] = mask_background(self.train_color_image[i], self.train_parsing_image_rgb[i])
+
+        for i in range(len(self.train_thermal_image)):
+            self.train_thermal_image[i] = mask_background(self.train_thermal_image[i], self.train_parsing_image_ir[i])
+
+
         # self.train_color_path = np.load(data_dir + 'train_rgb_resized_path.npy')
         self.train_thermal_path = np.load(data_dir + 'train_ir_resized_path.npy')
 
@@ -183,7 +192,7 @@ class SYSUData_Stage1_V2(data.Dataset):
 
         elif self.ir_cluster:
             img2, target2, path2 = self.train_thermal_image[index], self.train_thermal_label[index], self.train_thermal_path[index]
-            img2 = mask_background(img2, self.train_parsing_image_ir[index])
+            # img2 = mask_background(img2, self.train_parsing_image_ir[index])
             img2 = self.transform(img2)
             return img2, target2, path2
         else:
@@ -281,9 +290,9 @@ class SYSUData_Stage2_V2(data.Dataset):
         img2 = mask_background(img2, self.train_parsing_image_ir[self.tIndex[index]])
 
         trans_img1 = trans_color(img1, self.train_parsing_image_rgb[self.cIndex[index]], trans_color_list)
-        # img1 = self.transform_train_rgb(img1)
-        # img2 = self.transform_train_ir(img2)
-        # trans_img1 = self.transform_train_rgb(trans_img1)
+        img1 = self.transform_train_rgb(img1)
+        img2 = self.transform_train_ir(img2)
+        trans_img1 = self.transform_train_rgb(trans_img1)
 
         return img1, img2, target1, target2, trans_img1
                 # , self.train_parsing_image_rgb[self.cIndex[index]], self.train_parsing_image_ir[self.tIndex[index]]

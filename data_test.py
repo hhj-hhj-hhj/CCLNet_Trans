@@ -31,6 +31,13 @@ transform_train_ir = transforms.Compose([
     transforms.RandomErasing(p=0.5),
 ])
 
+transform_test = transforms.Compose([
+    transforms.ToPILImage(),
+    transforms.Resize((288, 144)),
+    transforms.ToTensor(),
+    normalizer,
+])
+
 trainset = SYSUData_Stage2_V2('E:/hhj/SYSU-MM01/', transform_train_rgb, transform_train_ir)
 
 color_pos, thermal_pos = GenIdx(trainset.train_color_label, trainset.train_thermal_label)
