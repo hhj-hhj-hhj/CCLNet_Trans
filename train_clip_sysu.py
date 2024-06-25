@@ -23,7 +23,7 @@ from train.train_1stage import do_train_stage1
 from util.make_optimizer import make_optimizer_1stage, make_optimizer_2stage
 from util.optim.lr_scheduler import WarmupMultiStepLR
 from util.optim.scheduler_factory import create_scheduler
-from data.dataloader import SYSUData_Stage1
+from data.dataloader import SYSUData_Stage1, SYSUData_Stage1_V2
 from model.make_model_clip import build_model
 from util.utils import Logger
 from model.make_model_clip import load_clip_to_cpu
@@ -78,7 +78,7 @@ def main_worker(args):
     print("==> Load unlabeled dataset")
     # data_path = '/home/cz/dataset/SYSU-MM01/'
     data_path = args.data_path
-    dataset = SYSUData_Stage1(data_dir=data_path, transform=transform_test, rgb_cluster=False,
+    dataset = SYSUData_Stage1_V2(data_dir=data_path, transform=transform_test, rgb_cluster=False,
                                         ir_cluster=False)
 
     n_color_class = len(np.unique(dataset.train_color_label))

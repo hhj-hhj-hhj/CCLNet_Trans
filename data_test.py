@@ -125,19 +125,17 @@ palette = get_palette(20)
 trans_color_list = [np.array(palette[3*i:3*i + 3]) for i in trans_idx]
 
 
-for n_iter, (img_rgb, img_ir, label_rgb, label_ir,pars_rgb, pars_ir) in enumerate(trainloader):
+for n_iter, (img_rgb, img_ir, label_rgb, label_ir,trans_img_rgb) in enumerate(trainloader):
     img_rgb = img_rgb.to(device)
     img_ir = img_ir.to(device)
-    pars_rgb = pars_rgb.to(device)
-    pars_ir = pars_ir.to(device)
 
-    trans_img = img_rgb.clone()
+
     # trans_img = mask_background(img_rgb, img_parsing)
     for color in trans_color_list:
         color = torch.tensor(color, device=device, dtype=torch.uint8)
         # trans_img = trans_color(trans_img,img_parsing, color)
     # trans_img = trans_color(trans_img, img_parsing)
-    for rgb,ir, trans_c, par_rgb, par_ir in zip(img_rgb, img_ir, trans_img,pars_rgb, pars_ir):
+    for rgb,ir, trans_img in zip(img_rgb, img_ir, trans_img_rgb):
         # trans_c = trans_color(trans_c, parsing, trans_color_list)
         # trans_c = torch.tensor(trans_c, device=device)
         # print(rgb.shape, parsing.shape)
@@ -145,26 +143,18 @@ for n_iter, (img_rgb, img_ir, label_rgb, label_ir,pars_rgb, pars_ir) in enumerat
         # 在同一窗口中显示三张图像
         plt.figure(figsize=(10, 10))
 
-        plt.subplot(1, 5, 1)
+        plt.subplot(1, 3, 1)
         imshow(rgb)
         plt.title('RGB')
 
-        plt.subplot(1, 5, 2)
-        imshow(par_rgb)
-        plt.title('PAR_RGB')
+        plt.subplot(1, 3, 2)
+        imshow(trans_img)
+        plt.title('trans_img')
 
 
-        plt.subplot(1, 5, 3)
-        imshow(trans_c)
-        plt.title('Trans_C')
-
-        plt.subplot(1, 5, 4)
+        plt.subplot(1, 3, 3)
         imshow(ir)
         plt.title('IR')
-
-        plt.subplot(1, 5, 5)
-        imshow(par_ir)
-        plt.title('PAR_IR')
 
         plt.show()
         input("Press Enter to continue...")

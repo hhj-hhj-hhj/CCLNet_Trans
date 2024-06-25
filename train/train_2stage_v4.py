@@ -285,39 +285,31 @@ def do_train_stage2_v4(args,
                 # res_rgb, res_ir = model(x1=img_rgb, x2=img_ir, modal=0)
 
                 # score_rgb, feat_rgb, image_features_rgb, score_ir, feat_ir, image_features_ir = model(x1=img_rgb, x2=img_ir, modal=0)
-                score_all,feat_all, image_features_all = model(x1=img_rgb, x2=img_ir, modal=0)
+                score_rgb_ir,feat_rgb_ir, image_features_all = model(x1=img_rgb, x2=img_ir, modal=0)
                 score_trans, feat_trans, image_features_trans = model(x1 = trans_imgs, x2 = trans_imgs, modal=1)
 
-                score_rgb_trans = [torch.cat((rgb[:img_rgb.size(0)], trans), 0) for rgb, trans in zip(score_all, score_trans)]
-                feat_rgb_trans = [torch.cat((rgb[:img_rgb.size(0)], trans), 0) for rgb, trans in zip(feat_all, score_trans)]
-                image_features_rgb_trans = [torch.cat((rgb[:img_rgb.size(0)], trans), 0) for rgb, trans in zip(image_features_all, score_trans)]
+                score_rgb_trans = [torch.cat((rgb[:img_rgb.size(0)], trans), 0) for rgb, trans in zip(score_rgb_ir, score_trans)]
+                feat_rgb_trans = [torch.cat((rgb[:img_rgb.size(0)], trans), 0) for rgb, trans in zip(feat_rgb_ir, score_trans)]
 
-                score_ir_trans = [torch.cat((ir[img_rgb.size(0):], trans), 0) for ir, trans in zip(score_all, score_trans)]
-                feat_ir_trans = [torch.cat((ir[img_rgb.size(0):], trans), 0) for ir, trans in zip(feat_all, score_trans)]
-                image_features_ir_trans = [torch.cat((ir[:img_rgb.size(0):], trans), 0) for ir, trans in zip(image_features_all, score_trans)]
-                # score_rgb = [score[:img_rgb.size(0)] for score in score_all]
-                # score_ir = [score[img_rgb.size(0):] for score in score_all]
-                # feat_rgb = [feat[:img_rgb.size(0)] for feat in feat_all]
-                # feat_ir = [feat[img_rgb.size(0):] for feat in feat_all]
-                # image_features_rgb, image_features_ir = image_features_all[:img_rgb.size(0)], image_features_all[img_rgb.size(0):]
 
-                # del image_features_all, feat_all, score_all
-
+                score_ir_trans = [torch.cat((ir[img_rgb.size(0):], trans), 0) for ir, trans in zip(score_rgb_ir, score_trans)]
+                feat_ir_trans = [torch.cat((ir[img_rgb.size(0):], trans), 0) for ir, trans in zip(feat_rgb_ir, score_trans)]
                 # print(score_ir[0].shape, score_rgb[0].shape)
 
                 logits_rgb = image_features_all[:img_rgb.size(0)] @ text_features_rgb.t()
                 logits_ir = image_features_all[img_rgb.size(0):] @ text_features_ir.t()
                 logits_trans = image_features_trans @ text_features_rgb.t()
 
-                loss_all = loss_fn(score_all, feat_all, torch.cat((label_rgb, label_ir), 0)) + \
-                    loss_fn(score_rgb_trans,feat_rgb_trans,torch.cat((label_rgb, label_rgb), 0)) + \
-                    loss_fn(score_ir_trans,feat_ir_trans,torch.cat((label_ir, label_rgb), 0))
+                rgb_ir_id_loss, rgb_ir_tri_loss = loss_fn(score_rgb_ir, feat_rgb_ir, torch.cat((label_rgb, label_ir), 0))
+                rgb_trans_id_loss, rgb_trans_tri_loss = loss_fn(score_rgb_trans,feat_rgb_trans,torch.cat((label_rgb, label_rgb), 0))
+                ir_trans_id_loss, ir_trans_tri_loss = loss_fn(score_ir_trans,feat_ir_trans,torch.cat((label_ir, label_rgb), 0))
 
-                ID_LOSS, TRI_LOSS = loss_all
 
+                ID_LOSS = rgb_ir_id_loss + rgb_trans_id_loss + ir_trans_id_loss
+                TRI_LOSS = rgb_ir_tri_loss + rgb_trans_tri_loss + ir_trans_tri_loss
                 I2TLOSS = xnet_rgb(logits_rgb, label_rgb) + xnet_ir(logits_ir, label_ir) + xnet_rgb(logits_trans, label_rgb)
 
-                ID_LOSS, TRI_LOSS, I2TLOSS = ID_LOSS / 3, TRI_LOSS / 3, I2TLOSS / 3
+                # ID_LOSS, TRI_LOSS, I2TLOSS = ID_LOSS / 3, TRI_LOSS / 3, I2TLOSS / 3
 
                 loss_all = args.id_loss_weight * ID_LOSS + args.triplet_loss_weight * TRI_LOSS + args.i2t_loss_weight * I2TLOSS
 

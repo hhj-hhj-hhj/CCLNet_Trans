@@ -280,11 +280,13 @@ class SYSUData_Stage2_V2(data.Dataset):
         img1 = mask_background(img1, self.train_parsing_image_rgb[self.cIndex[index]])
         img2 = mask_background(img2, self.train_parsing_image_ir[self.tIndex[index]])
 
-        img1 = trans_color(img1, self.train_parsing_image_rgb[self.cIndex[index]], trans_color_list)
+        trans_img1 = trans_color(img1, self.train_parsing_image_rgb[self.cIndex[index]], trans_color_list)
         # img1 = self.transform_train_rgb(img1)
         # img2 = self.transform_train_ir(img2)
+        # trans_img1 = self.transform_train_rgb(trans_img1)
 
-        return img1, img2, target1, target2, self.train_parsing_image_rgb[self.cIndex[index]], self.train_parsing_image_ir[self.tIndex[index]]
+        return img1, img2, target1, target2, trans_img1
+                # , self.train_parsing_image_rgb[self.cIndex[index]], self.train_parsing_image_ir[self.tIndex[index]]
 
     def __len__(self):
         return len(self.train_color_label)
