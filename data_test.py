@@ -3,7 +3,7 @@ import torch
 import torch.utils.data as data
 import torchvision.transforms as transforms
 
-from data.dataloader import SYSUData_Stage2, RegDBData_Stage2, IterLoader, TestData
+from data.dataloader import SYSUData_Stage2, RegDBData_Stage2, IterLoader, TestData, SYSUData_Stage2_V2
 from util.utils import IdentitySampler_nosk, GenIdx, IdentitySampler_nosk_stage4
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,8 +11,17 @@ import numpy as np
 device = torch.device('cuda')
 
 normalizer = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-
-transform_train = transforms.Compose([
+transform_train_rgb = transforms.Compose([
+    transforms.ToPILImage(),
+    transforms.RandomGrayscale(p=0.5),
+    transforms.RandomHorizontalFlip(p=0.5),
+    transforms.Pad(10),
+    transforms.RandomCrop((288, 144)),
+    transforms.ToTensor(),
+    normalizer,
+    transforms.RandomErasing(p=0.5)
+])
+transform_train_ir = transforms.Compose([
     transforms.ToPILImage(),
     transforms.RandomHorizontalFlip(p=0.5),
     transforms.Pad(10),
@@ -22,7 +31,7 @@ transform_train = transforms.Compose([
     transforms.RandomErasing(p=0.5),
 ])
 
-trainset = SYSUData_Stage2('E:/hhj/SYSU-MM01/')
+trainset = SYSUData_Stage2_V2('E:/hhj/SYSU-MM01/', transform_train_rgb, transform_train_ir)
 
 color_pos, thermal_pos = GenIdx(trainset.train_color_label, trainset.train_thermal_label)
 
@@ -72,11 +81,21 @@ def trans_color(trans_img, parsing_img, clothe_color_list):
     parsing_img = parsing_img.cpu().numpy()
     trans_img = trans_img.cpu().numpy()
     for clothe_color in clothe_color_list:
-        clothes_pixels = np.all(parsing_img == clothe_color, axis=-1, keepdims=True)
+        clothes_pixels = np.all(parsing_img == clothe_color, axis=-1)
         trans_img = adjust_clothes_color(trans_img, clothes_pixels)
 
     return trans_img
 
+
+def mask_background(image, parsing, background_color=torch.tensor([0, 0, 0], device=device)):
+    # 将解析图中的背景（颜色为[0,0,0]）找出来
+    # background_color = background_color.view(1, 1, 1, -1).expand(*image.shape)
+    background_pixels = torch.all(parsing == background_color, dim=-1)
+    # background_pixels = background_pixels.expand(-1, -1, -1, 3)
+    # 将背景部分设置为全黑（或其他你想要的颜色）
+    image[background_pixels] = torch.tensor([0, 0, 0], device=device, dtype=torch.uint8)
+
+    return image
 
 def get_palette(num_cls):
     """ Returns the color map for visualizing the segmentation mask.
@@ -106,34 +125,46 @@ palette = get_palette(20)
 trans_color_list = [np.array(palette[3*i:3*i + 3]) for i in trans_idx]
 
 
-for n_iter, (img_rgb, img_ir, label_rgb, label_ir, img_parsing) in enumerate(trainloader):
+for n_iter, (img_rgb, img_ir, label_rgb, label_ir,pars_rgb, pars_ir) in enumerate(trainloader):
     img_rgb = img_rgb.to(device)
     img_ir = img_ir.to(device)
-    img_parsing = img_parsing.to(device)
+    pars_rgb = pars_rgb.to(device)
+    pars_ir = pars_ir.to(device)
+
     trans_img = img_rgb.clone()
-    # for color in trans_color_list:
-    #     # color = torch.tensor(color, device=device, dtype=torch.uint8)
-    #     trans_img = trans_color(trans_img,img_parsing, color)
+    # trans_img = mask_background(img_rgb, img_parsing)
+    for color in trans_color_list:
+        color = torch.tensor(color, device=device, dtype=torch.uint8)
+        # trans_img = trans_color(trans_img,img_parsing, color)
     # trans_img = trans_color(trans_img, img_parsing)
-    for rgb, parsing, trans_c in zip(img_rgb, img_parsing, trans_img):
-        trans_c = trans_color(trans_c, parsing, trans_color_list)
-        trans_c = torch.tensor(trans_c, device=device)
-        print(rgb.shape, parsing.shape)
+    for rgb,ir, trans_c, par_rgb, par_ir in zip(img_rgb, img_ir, trans_img,pars_rgb, pars_ir):
+        # trans_c = trans_color(trans_c, parsing, trans_color_list)
+        # trans_c = torch.tensor(trans_c, device=device)
+        # print(rgb.shape, parsing.shape)
 
         # 在同一窗口中显示三张图像
         plt.figure(figsize=(10, 10))
 
-        plt.subplot(1, 3, 1)
+        plt.subplot(1, 5, 1)
         imshow(rgb)
         plt.title('RGB')
 
-        plt.subplot(1, 3, 2)
-        imshow(parsing)
-        plt.title('Parsing')
+        plt.subplot(1, 5, 2)
+        imshow(par_rgb)
+        plt.title('PAR_RGB')
 
-        plt.subplot(1, 3, 3)
+
+        plt.subplot(1, 5, 3)
         imshow(trans_c)
-        plt.title('Train_C')
+        plt.title('Trans_C')
+
+        plt.subplot(1, 5, 4)
+        imshow(ir)
+        plt.title('IR')
+
+        plt.subplot(1, 5, 5)
+        imshow(par_ir)
+        plt.title('PAR_IR')
 
         plt.show()
         input("Press Enter to continue...")

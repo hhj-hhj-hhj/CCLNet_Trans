@@ -54,7 +54,7 @@ def path_trans(path):
     new_path = '/'.join(new_path_list)
     return new_path
 
-files_parsing = [path_trans(path) for path in files_rgb]
+files_parsing = [path_trans(path) for path in files_ir]
 
 # relabel
 pid_container = set()
@@ -128,7 +128,7 @@ import matplotlib.pyplot as plt
 
     # break
 
-np.save(data_path + 'train_parsing_img.npy', train_img)
+np.save(data_path + 'train_parsing_img_ir.npy', train_img)
 
 # # rgb imges
 # train_img, train_label, train_path = read_imgs(files_rgb)

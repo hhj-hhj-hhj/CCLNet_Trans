@@ -80,14 +80,9 @@ def main_worker(args):
     data_path = args.data_path
     dataset = SYSUData_Stage1(data_dir=data_path, transform=transform_test, rgb_cluster=False,
                                         ir_cluster=False)
-    if -1 in dataset.train_color_label:
-        n_color_class = len(np.unique(dataset.train_color_label)) - 1
-    else:
-        n_color_class = len(np.unique(dataset.train_color_label)) 
-    if -1 in dataset.train_thermal_label:
-        n_thermal_class = len(np.unique(dataset.train_thermal_label)) - 1
-    else:
-        n_thermal_class = len(np.unique(dataset.train_thermal_label))
+
+    n_color_class = len(np.unique(dataset.train_color_label))
+    n_thermal_class = len(np.unique(dataset.train_thermal_label))
     # num_classes = n_color_class + n_thermal_class
 
     print("Dataset {} Statistics:".format(args.dataset))
