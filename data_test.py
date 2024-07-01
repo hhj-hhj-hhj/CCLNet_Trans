@@ -7,7 +7,10 @@ from data.dataloader import SYSUData_Stage2, RegDBData_Stage2, IterLoader, TestD
 from util.utils import IdentitySampler_nosk, GenIdx, IdentitySampler_nosk_stage4
 import matplotlib.pyplot as plt
 import numpy as np
+from util.transforms import RGB_HSV
+from util.trans_function import RGB2HSV, HSV2RGB
 
+rgb_hsv = RGB_HSV()
 device = torch.device('cuda')
 
 normalizer = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -43,7 +46,7 @@ trainset = SYSUData_Stage2_V2('E:/hhj/SYSU-MM01/', transform_train_rgb, transfor
 color_pos, thermal_pos = GenIdx(trainset.train_color_label, trainset.train_thermal_label)
 
 sampler = IdentitySampler_nosk_stage4(trainset.train_color_label, trainset.train_thermal_label, color_pos, thermal_pos,
-                               16, 4)
+                               2, 2)
 
 trainset.cIndex = sampler.index1
 trainset.tIndex = sampler.index2
@@ -62,7 +65,7 @@ def adjust_clothes_color(image_numpy, mask_numpy):
     """
     # 将图像从RGB转换到HSV颜色空间
     image_hsv = cv2.cvtColor(image_numpy, cv2.COLOR_RGB2HSV)
-
+    # image_hsv = RGB2HSV(image_numpy)
     # 生成一个随机色调
     random_hue = np.random.randint(0, 360)  # HSV色调范围是[0, 179]
 
@@ -80,7 +83,9 @@ def adjust_clothes_color(image_numpy, mask_numpy):
 
     # HSV颜色空间转换回RGB
     adjusted_image_rgb = cv2.cvtColor(image_hsv, cv2.COLOR_HSV2RGB)
-
+    # print(image_hsv.shape)
+    # adjusted_image_rgb = HSV2RGB(image_hsv)
+    # print(adjusted_image_rgb.shape)
     return adjusted_image_rgb
 
 
@@ -132,7 +137,7 @@ palette = get_palette(20)
 trans_color_list = [np.array(palette[3*i:3*i + 3]) for i in trans_idx]
 
 
-for n_iter, (img_rgb, img_ir, label_rgb, label_ir,trans_img_rgb) in enumerate(trainloader):
+for n_iter, (img_rgb, img_ir, label_rgb, label_ir,parsings) in enumerate(trainloader):
     img_rgb = img_rgb.to(device)
     img_ir = img_ir.to(device)
 
@@ -142,10 +147,24 @@ for n_iter, (img_rgb, img_ir, label_rgb, label_ir,trans_img_rgb) in enumerate(tr
         color = torch.tensor(color, device=device, dtype=torch.uint8)
         # trans_img = trans_color(trans_img,img_parsing, color)
     # trans_img = trans_color(trans_img, img_parsing)
-    for rgb,ir, trans_img in zip(img_rgb, img_ir, trans_img_rgb):
+    # print(img_rgb.shape, img_ir.shape)
+    trans_img = img_rgb.clone()
+    trans_img = trans_img.permute(0, 3, 1, 2)
+    print(img_rgb.shape)
+    trans_img = rgb_hsv.rgb_to_hsv(trans_img)
+    trans_img = rgb_hsv.hsv_to_rgb(trans_img)
+    print(trans_img.shape)
+    trans_img = trans_img.permute(0, 2, 3, 1)
+    for rgb,trans_c, parsing in zip(img_rgb, trans_img, parsings):
+        # trans_c = rgb.clone()
+        # trans_c = rgb_hsv.rgb_to_hsv()
+        # trans_c = rgb.clone()
         # trans_c = trans_color(trans_c, parsing, trans_color_list)
         # trans_c = torch.tensor(trans_c, device=device)
         # print(rgb.shape, parsing.shape)
+        # rgb = rgb.permute(1, 2, 0)
+        # trans_c = trans_c.permute(1, 2, 0)
+        # ir =  ir.permute(1, 2, 0)
 
         # 在同一窗口中显示三张图像
         plt.figure(figsize=(10, 10))
@@ -155,13 +174,13 @@ for n_iter, (img_rgb, img_ir, label_rgb, label_ir,trans_img_rgb) in enumerate(tr
         plt.title('RGB')
 
         plt.subplot(1, 3, 2)
-        imshow(trans_img)
+        imshow(trans_c)
         plt.title('trans_img')
 
 
         plt.subplot(1, 3, 3)
-        imshow(ir)
-        plt.title('IR')
+        imshow(parsing)
+        plt.title('Parsing')
 
         plt.show()
         input("Press Enter to continue...")

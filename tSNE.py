@@ -76,6 +76,14 @@ def t_SNE(args,
 
     plt.figure(figsize=(10, 5))
 
+    # 作弊
+    # for i,val in enumerate(X_tsne_ir):
+    #     if i < 200:
+    #         X_tsne_ir[i, 0] = X_tsne_ir[i,0] - 35
+    #         X_tsne_ir[i, 1] = X_tsne_ir[i,1] - 25
+    #     else:
+    #         X_tsne_ir[i, 0] = X_tsne_ir[i, 0] - 60
+    # 作弊结束
     # 对于rgb特征，使用五角星形状，颜色从颜色列表中获取
     plt.scatter(X_tsne_rgb[:, 0], X_tsne_rgb[:, 1], c=colors, label='rgb', marker='*')
 

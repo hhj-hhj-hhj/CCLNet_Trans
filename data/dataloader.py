@@ -286,15 +286,15 @@ class SYSUData_Stage2_V2(data.Dataset):
     def __getitem__(self, index):
         img1, target1 = self.train_color_image[self.cIndex[index]], self.train_color_label[self.cIndex[index]]
         img2, target2 = self.train_thermal_image[self.tIndex[index]], self.train_thermal_label[self.tIndex[index]]
-        img1 = mask_background(img1, self.train_parsing_image_rgb[self.cIndex[index]])
-        img2 = mask_background(img2, self.train_parsing_image_ir[self.tIndex[index]])
+        # img1 = mask_background(img1, self.train_parsing_image_rgb[self.cIndex[index]])
+        # img2 = mask_background(img2, self.train_parsing_image_ir[self.tIndex[index]])
 
-        trans_img1 = trans_color(img1, self.train_parsing_image_rgb[self.cIndex[index]], trans_color_list)
-        img1 = self.transform_train_rgb(img1)
-        img2 = self.transform_train_ir(img2)
-        trans_img1 = self.transform_train_rgb(trans_img1)
+        # trans_img1 = trans_color(img1, self.train_parsing_image_rgb[self.cIndex[index]], trans_color_list)
+        # img1 = self.transform_train_rgb(img1)
+        # img2 = self.transform_train_ir(img2)
+        # trans_img1 = self.transform_train_rgb(trans_img1)
 
-        return img1, img2, target1, target2, trans_img1
+        return img1, img2, target1, target2, self.train_parsing_image_rgb[self.cIndex[index]]
                 # , self.train_parsing_image_rgb[self.cIndex[index]], self.train_parsing_image_ir[self.tIndex[index]]
 
     def __len__(self):
