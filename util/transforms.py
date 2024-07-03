@@ -3,7 +3,7 @@ import numpy as np
 import math
 
 class RandomColoring_tensor(object):
-    def __init__(self, p=0.5, sl=0.02, sh=0.4, r1=0.3, r2=3.33, is_rgb = True):
+    def __init__(self, p=0.5, sl=0.02, sh=0.4, r1=0.3, r2=3.33, is_rgb=True):
         self.p = p
         self.sl = sl
         self.sh = sh
@@ -42,7 +42,7 @@ class RandomColoring_tensor(object):
         return img
 
 class RandomColoring(object):
-    def __init__(self, p=0.5, sl=0.02, sh=0.4, r1=0.3, r2=3.33, is_rgb = True):
+    def __init__(self, p=0.5, sl=0.02, sh=0.4, r1=0.3, r2=3.33, is_rgb=True):
         self.p = p
         self.sl = sl
         self.sh = sh
