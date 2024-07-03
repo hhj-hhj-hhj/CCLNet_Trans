@@ -1,4 +1,79 @@
 import torch
+import numpy as np
+import math
+
+class RandomColoring_tensor(object):
+    def __init__(self, p=0.5, sl=0.02, sh=0.4, r1=0.3, r2=3.33, is_rgb = True):
+        self.p = p
+        self.sl = sl
+        self.sh = sh
+        self.r1 = r1
+        self.r2 = r2
+        self.is_rgb = is_rgb
+
+    def __call__(self, img):
+        is_rgb = self.is_rgb
+        if torch.rand(1) >= self.p: return img
+        # cvt = RGB_HSV()
+        # img = cvt.rgb_to_hsv(img.unsqueeze(0))[0]
+        for attempt in range(5):
+            area = img.size()[1] * img.size()[2]
+            area = torch.tensor(area, device=img.device)
+            target_area = (self.sl + torch.rand(1,device=img.device) * (self.sh - self.sl))* area
+            # target_area = target_area.to(img.device)
+            aspect_ratio = self.r1 + torch.rand(1,device=img.device)  * (self.r2 - self.r1)
+            aspect_ratio = torch.tensor(aspect_ratio, device=img.device)
+            # aspect_ratio = aspect_ratio.to(img.device)
+            h = int(round(math.sqrt(target_area * aspect_ratio)))
+            w = int(round(math.sqrt(target_area / aspect_ratio)))
+            if w < img.size()[2] and h < img.size()[1]:
+                x1 = torch.randint(0, img.size()[1] - h, (1,),device=img.device)
+                y1 = torch.randint(0, img.size()[2] - w, (1,),device=img.device)
+                if is_rgb:
+                    img[0, x1:x1 + h, y1:y1 + w] = torch.rand(1,device=img.device)
+                    img[1, x1:x1 + h, y1:y1 + w] = img[1, x1:x1 + h, y1:y1 + w] * 0.5 + 0.5 * torch.rand(1,device=img.device)
+                    img[2, x1:x1 + h, y1:y1 + w] = img[2, x1:x1 + h, y1:y1 + w] * 0.9 + 0.1 * (
+                                1 + torch.rand(1,device=img.device)  * (1. / img[2, x1:x1 + h, y1:y1 + w].max() - 1))
+                else:
+                    img[0, x1:x1 + h, y1:y1 + w] = torch.rand(1,device=img.device)
+                    img[1, x1:x1 + h, y1:y1 + w] = img[1, x1:x1 + h, y1:y1 + w] * 0.5 + 0.5 * torch.rand(1,device=img.device)
+                    img[2, x1:x1 + h, y1:y1 + w] = img[2, x1:x1 + h, y1:y1 + w] * 0.5 + 0.5 * torch.rand(1,device=img.device)
+        # img = cvt.hsv_to_rgb(img.unsqueeze(0))[0]
+        return img
+
+class RandomColoring(object):
+    def __init__(self, p=0.5, sl=0.02, sh=0.4, r1=0.3, r2=3.33, is_rgb = True):
+        self.p = p
+        self.sl = sl
+        self.sh = sh
+        self.r1 = r1
+        self.r2 = r2
+        self.is_rgb = is_rgb
+    def __call__(self, img):
+        is_rgb = self.is_rgb
+        if np.random.uniform(0, 1) >= self.p:return img
+        cvt = RGB_HSV()
+        img = cvt.rgb_to_hsv(img.unsqueeze(0))[0]
+        for attempt in range(5):
+            area = img.size()[1] * img.size()[2]
+            target_area = np.random.uniform(self.sl, self.sh) * area
+            #用np.random和测试的random.random分开
+            aspect_ratio = np.random.uniform(self.r1, self.r2)
+            h = int(round(math.sqrt(target_area * aspect_ratio)))
+            w = int(round(math.sqrt(target_area / aspect_ratio)))
+            if w < img.size()[2] and h < img.size()[1]:
+                x1 = np.random.randint(0, img.size()[1] - h)
+                y1 = np.random.randint(0, img.size()[2] - w)
+                if is_rgb:
+                    img[0, x1:x1 + h, y1:y1 + w] = np.random.uniform(0, 1)
+                    img[1, x1:x1 + h, y1:y1 + w] = img[1, x1:x1 + h, y1:y1 + w] * 0.5 + 0.5 * np.random.uniform(0, 1)# RGB饱和度高，现在要降一些，适应IR
+                    img[2, x1:x1 + h, y1:y1 + w] = img[2, x1:x1 + h, y1:y1 + w] * 0.9 + 0.1 * np.random.uniform(1, 1./(img[2, x1:x1 + h, y1:y1 + w].max()))# RGB亮度没有很高，现在要高一些，适应IR
+                else:
+                    img[0, x1:x1 + h, y1:y1 + w] = np.random.uniform(0, 1) #(img[0, x1:x1 + h, y1:y1 + w] + np.random.uniform(0, 1))%1
+                    img[1, x1:x1 + h, y1:y1 + w] = img[1, x1:x1 + h, y1:y1 + w] * 0.5 + 0.5 * np.random.uniform(0, 1)
+                    img[2, x1:x1 + h, y1:y1 + w] = img[2, x1:x1 + h, y1:y1 + w] * 0.5 + 0.5 * np.random.uniform(0, 1)
+        img = cvt.hsv_to_rgb(img.unsqueeze(0))[0]
+        return img
 
 class RGB_HSV(torch.nn.Module):
     def __init__(self, eps=1e-8):
@@ -6,6 +81,8 @@ class RGB_HSV(torch.nn.Module):
         self.eps = eps
 
     def rgb_to_hsv(self, img):
+        # img: (B, C, H, W)
+        # img = img / 255.0
         hue = torch.Tensor(img.shape[0], img.shape[2], img.shape[3]).to(img.device)
 
         hue[img[:, 2] == img.max(1)[0]] = 4.0 + ((img[:, 0] - img[:, 1]) / (img.max(1)[0] - img.min(1)[0] + self.eps))[

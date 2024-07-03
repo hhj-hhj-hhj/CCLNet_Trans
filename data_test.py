@@ -7,7 +7,7 @@ from data.dataloader import SYSUData_Stage2, RegDBData_Stage2, IterLoader, TestD
 from util.utils import IdentitySampler_nosk, GenIdx, IdentitySampler_nosk_stage4
 import matplotlib.pyplot as plt
 import numpy as np
-from util.transforms import RGB_HSV
+from util.transforms import RGB_HSV, RandomColoring, RandomColoring_tensor
 from util.trans_function import RGB2HSV, HSV2RGB
 
 rgb_hsv = RGB_HSV()
@@ -33,15 +33,29 @@ transform_train_ir = transforms.Compose([
     normalizer,
     transforms.RandomErasing(p=0.5),
 ])
-
-transform_test = transforms.Compose([
+transform_test_rgb = transforms.Compose([
     transforms.ToPILImage(),
     transforms.Resize((288, 144)),
     transforms.ToTensor(),
-    normalizer,
+    RandomColoring(p=0.5,is_rgb=True),
+    # normalizer,
+])
+transform_test_rgb = transforms.Compose([
+    transforms.ToPILImage(),
+    transforms.Resize((288, 144)),
+    transforms.ToTensor(),
+    # RandomColoring_tensor(p=0.5,is_rgb=True),
+    # normalizer,
+])
+transform_test_ir = transforms.Compose([
+    transforms.ToPILImage(),
+    transforms.Resize((288, 144)),
+    transforms.ToTensor(),
+    # RandomColoring_tensor(p=0.5,is_rgb=False),
+    # normalizer,
 ])
 
-trainset = SYSUData_Stage2_V2('E:/hhj/SYSU-MM01/', transform_train_rgb, transform_train_ir)
+trainset = SYSUData_Stage2_V2('E:/hhj/SYSU-MM01/', transform_test_rgb, transform_test_ir)
 
 color_pos, thermal_pos = GenIdx(trainset.train_color_label, trainset.train_thermal_label)
 
@@ -136,26 +150,54 @@ trans_idx = [1,3,5,6,7,8,9,10,11,12,18,19]
 palette = get_palette(20)
 trans_color_list = [np.array(palette[3*i:3*i + 3]) for i in trans_idx]
 
+cvt = RGB_HSV()
 
-for n_iter, (img_rgb, img_ir, label_rgb, label_ir,parsings) in enumerate(trainloader):
+for n_iter, (img_rgb, img_ir, label_rgb, label_ir, trans_img) in enumerate(trainloader):
     img_rgb = img_rgb.to(device)
     img_ir = img_ir.to(device)
+    trans_img = trans_img.to(device)
 
+    hsv_rgb = cvt.rgb_to_hsv(img_rgb)
+    hsv_ir = cvt.rgb_to_hsv(img_ir)
+    hsv_trans = cvt.rgb_to_hsv(trans_img)
+
+    rgbs = []
+    irs = []
+    transs = []
+
+    for rgb, ir, trans_c in zip(hsv_rgb, hsv_ir, hsv_trans):
+        # rgbs.append(RandomColoring_tensor(p=0.5, is_rgb=True)(rgb))
+        irs.append(RandomColoring_tensor(p=0.5, is_rgb=False)(ir))
+        transs.append(RandomColoring_tensor(p=0.5,is_rgb=True)(trans_c))
+
+    # rgbs = torch.stack(rgbs, dim=0)
+    irs = torch.stack(irs, dim=0)
+    transs = torch.stack(transs, dim=0)
+
+    # img_rgb = cvt.hsv_to_rgb(rgbs)
+    img_ir = cvt.hsv_to_rgb(irs)
+    trans_img = cvt.hsv_to_rgb(transs)
 
     # trans_img = mask_background(img_rgb, img_parsing)
-    for color in trans_color_list:
-        color = torch.tensor(color, device=device, dtype=torch.uint8)
+    # for color in trans_color_list:
+    #     color = torch.tensor(color, device=device, dtype=torch.uint8)
         # trans_img = trans_color(trans_img,img_parsing, color)
     # trans_img = trans_color(trans_img, img_parsing)
     # print(img_rgb.shape, img_ir.shape)
-    trans_img = img_rgb.clone()
-    trans_img = trans_img.permute(0, 3, 1, 2)
-    print(img_rgb.shape)
-    trans_img = rgb_hsv.rgb_to_hsv(trans_img)
-    trans_img = rgb_hsv.hsv_to_rgb(trans_img)
-    print(trans_img.shape)
+    img_rgb = img_rgb.permute(0, 2, 3, 1)
     trans_img = trans_img.permute(0, 2, 3, 1)
-    for rgb,trans_c, parsing in zip(img_rgb, trans_img, parsings):
+    img_ir = img_ir.permute(0, 2, 3, 1)
+    # trans_img = img_rgb.clone()
+    # trans_img = trans_img.permute(0, 3, 1, 2)
+    # trans_img = trans_img / 255.0
+    # print(img_rgb.shape)
+    # trans_img = rgb_hsv.rgb_to_hsv(trans_img)
+    # trans_img = rgb_hsv.hsv_to_rgb(trans_img)
+    # trans_img = (trans_img * 255).int()
+    # print(trans_img.shape)
+    # trans_img = trans_img.permute(0, 2, 3, 1)
+    for rgb,ir,trans_c in zip(img_rgb, img_ir, trans_img):
+
         # trans_c = rgb.clone()
         # trans_c = rgb_hsv.rgb_to_hsv()
         # trans_c = rgb.clone()
@@ -179,8 +221,8 @@ for n_iter, (img_rgb, img_ir, label_rgb, label_ir,parsings) in enumerate(trainlo
 
 
         plt.subplot(1, 3, 3)
-        imshow(parsing)
-        plt.title('Parsing')
+        imshow(ir)
+        plt.title('IR')
 
         plt.show()
         input("Press Enter to continue...")

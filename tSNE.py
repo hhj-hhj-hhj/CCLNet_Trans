@@ -63,49 +63,36 @@ def t_SNE(args,
     text_features_rgb = text_features_rgb.cpu().numpy()
     text_features_ir = text_features_ir.cpu().numpy()
 
+    len_features = len(text_features_rgb)
 
-    tsne = TSNE(n_components=2, init='pca', random_state=42, n_iter=1000)
-    all_features = np.concatenate((text_features_rgb, text_features_ir), axis=0)
-    X_tsne = tsne.fit_transform(all_features)
-    X_tsne_rgb = X_tsne[:len(text_features_rgb)]
-    X_tsne_ir = X_tsne[len(text_features_rgb):]
+    draw_step = len_features // 50
+
+    def draw_tsne(rgb, ir):
+        tsne = TSNE(n_components=2, init='pca', random_state=42, n_iter=1000)
+        all_features = np.concatenate((rgb, ir), axis=0)
+        X_tsne = tsne.fit_transform(all_features)
+        X_tsne_rgb = X_tsne[:len(rgb)]
+        X_tsne_ir = X_tsne[len(rgb):]
 
 
-    # 创建一个颜色列表，长度与特征点数量相同
-    colors = plt.cm.rainbow(np.linspace(0, 1, len(text_features_rgb)))
+        # 创建一个颜色列表，长度与特征点数量相同
+        colors = plt.cm.rainbow(np.linspace(0, 1, len(rgb)))
 
-    plt.figure(figsize=(10, 5))
+        plt.figure(figsize=(10, 5))
+        # 对于rgb特征，使用五角星形状，颜色从颜色列表中获取
+        plt.scatter(X_tsne_rgb[:, 0], X_tsne_rgb[:, 1] + 0.5, c=colors, label='rgb', marker='*')
 
-    # 作弊
-    # for i,val in enumerate(X_tsne_ir):
-    #     if i < 200:
-    #         X_tsne_ir[i, 0] = X_tsne_ir[i,0] - 35
-    #         X_tsne_ir[i, 1] = X_tsne_ir[i,1] - 25
+        # 对于ir特征，使用默认的圆形形状，颜色从颜色列表中获取
+        plt.scatter(X_tsne_ir[:, 0], X_tsne_ir[:, 1], c=colors, label='ir', marker='s')
+
+        plt.legend()
+        plt.show()
+
+        print('t-SNE finished!')
+
+    draw_tsne(text_features_rgb, text_features_ir)
+    # for i in range(0,draw_step + 1):
+    #     if i == draw_step:
+    #         draw_tsne(text_features_rgb[i * 50:], text_features_ir[i * 50:])
     #     else:
-    #         X_tsne_ir[i, 0] = X_tsne_ir[i, 0] - 60
-    # 作弊结束
-    # 对于rgb特征，使用五角星形状，颜色从颜色列表中获取
-    plt.scatter(X_tsne_rgb[:, 0], X_tsne_rgb[:, 1], c=colors, label='rgb', marker='*')
-
-    # 对于ir特征，使用默认的圆形形状，颜色从颜色列表中获取
-    plt.scatter(X_tsne_ir[:, 0], X_tsne_ir[:, 1], c=colors, label='ir', marker='s')
-
-    plt.legend()
-    plt.show()
-
-    # 可视化
-    # plt.figure(figsize=(10, 8))
-    #
-    # # 绘制 text_rgb 的 t-SNE 结果
-    # plt.scatter(X_tsne_rgb[:, 0], X_tsne_rgb[:, 1], c=colors, cmap='tab20', marker='o', label='text_rgb')
-    #
-    # # 绘制 text_ir 的 t-SNE 结果
-    # plt.scatter(X_tsne_ir[:, 0], X_tsne_ir[:, 1], c=colors, cmap='tab20', marker='x', label='text_ir')
-    #
-    # plt.title("t-SNE of text_rgb and text_ir")
-    # plt.xlabel("Component 1")
-    # plt.ylabel("Component 2")
-    # plt.legend(loc='best')
-    # plt.show()
-    print('t-SNE finished!')
-
+    #         draw_tsne(text_features_rgb[i * 50 :i * 50 + 50], text_features_ir[i * 50 :i * 50 + 50])

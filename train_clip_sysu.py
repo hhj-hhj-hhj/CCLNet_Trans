@@ -27,6 +27,7 @@ from data.dataloader import SYSUData_Stage1, SYSUData_Stage1_V2
 from model.make_model_clip import build_model
 from util.utils import Logger
 from model.make_model_clip import load_clip_to_cpu
+from util.transforms import RandomColoring
 
 
 start_epoch = best_mAP = 0
@@ -68,18 +69,32 @@ def main_worker(args):
     print("==========\nArgs:{}\n==========".format(args))
     # Load datasets
     normalizer = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    transform_test = transforms.Compose([
+    # transform_test = transforms.Compose([
+    #     transforms.ToPILImage(),
+    #     transforms.Resize((args.img_h, args.img_w)),
+    #     transforms.ToTensor(),
+    #     normalizer,
+    # ])
+    transform_test_rgb = transforms.Compose([
         transforms.ToPILImage(),
-        transforms.Resize((args.img_h, args.img_w)),
+        transforms.Resize((288, 144)),
         transforms.ToTensor(),
+        RandomColoring(p=0.5,is_rgb=True),
         normalizer,
     ])
+    transform_test_ir = transforms.Compose([
+        transforms.ToPILImage(),
+        transforms.Resize((288, 144)),
+        transforms.ToTensor(),
+        RandomColoring(p=0.5,is_rgb=False),
+        normalizer,
+    ])
+
     end = time.time()
     print("==> Load unlabeled dataset")
     # data_path = '/home/cz/dataset/SYSU-MM01/'
     data_path = args.data_path
-    dataset = SYSUData_Stage1_V2(data_dir=data_path, transform=transform_test, rgb_cluster=False,
-                                        ir_cluster=False)
+    dataset = SYSUData_Stage1_V2(data_dir=data_path, transform_rgb=transform_test_rgb,transform_test_ir=transform_test_ir)
 
     n_color_class = len(np.unique(dataset.train_color_label))
     n_thermal_class = len(np.unique(dataset.train_thermal_label))
@@ -100,8 +115,6 @@ def main_worker(args):
     # Create model
     model = build_model(args, n_color_class, n_thermal_class)
 
-    clip_model = load_clip_to_cpu(model.model_name, model.h_resolution, model.w_resolution, model.vision_stride_size)
-    clip_model.to("cuda")
 
     # checkpoint = torch.load(args.resume_path)
     # model.load_state_dict(checkpoint['state_dict'])
