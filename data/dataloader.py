@@ -124,6 +124,55 @@ class SYSUData_Stage1_V2(data.Dataset):
             print("error len!!")
 
 
+class SYSUData_Stage1_RGB(data.Dataset):
+    def __init__(self,data_dir,transform_rgb):
+        self.train_color_image = np.load(data_dir+'train_rgb_resized_img.npy')
+
+        self.train_color_label = np.load(data_dir+'train_rgb_resized_label.npy')
+
+        self.num_rgb = len(self.train_color_image)
+
+        self.transform_rgb = transform_rgb
+
+
+    def __getitem__(self, index):
+        img1, target1 = self.train_color_image[index], self.train_color_label[index]
+        img1 = self.transform_rgb(img1)
+        return img1, target1
+
+
+    def __len__(self):
+        return len(self.train_color_image)
+
+
+
+
+class SYSUData_Stage1_IR(data.Dataset):
+    def __init__(self,data_dir,transform_ir,num_rgb):
+        self.train_thermal_image = np.load(data_dir+'train_ir_resized_img.npy')
+
+        self.train_thermal_label = np.load(data_dir + 'train_ir_resized_label.npy')
+
+        self.num_rgb = num_rgb
+        self.num_ir = len(self.train_thermal_image)
+        self.idx_ir = None
+        self.init_ir = np.array([i for i in range(self.num_ir)])
+
+        self.transform_ir = transform_ir
+    def resetIdx(self):
+        self.idx_ir = np.concatenate([self.init_ir,np.random.randint(0,self.num_ir,self.num_rgb - self.num_ir)])
+
+    def __getitem__(self, index):
+        img2, target2 = self.train_thermal_image[self.idx_ir[index]], self.train_thermal_label[self.idx_ir[index]]
+        img2 = self.transform_ir(img2)
+        return img2, target2
+
+
+    def __len__(self):
+        return len(self.train_thermal_image)
+
+
+
 # class SYSUData_Stage2(data.Dataset):
 #     def __init__(self, data_dir, transform_train_rgb=None, transform_train_ir=None, colorIndex=None, thermalIndex=None):
 #         # Load training images (path) and labels
